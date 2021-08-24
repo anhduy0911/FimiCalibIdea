@@ -120,6 +120,10 @@ class ForGAN:
 
             if step % 100 == 0:
                 print(YELLOW_TEXT + BOLD + "step : {} , d_loss : {} , g_loss : {}".format(step, d_loss, g_loss) + ENDC)
+                torch.save({
+                    'g_state_dict': self.generator.state_dict(), 
+                    'd_state_dict': self.discriminator.state_dict(), 
+                }, "./{}/checkpoint.torch".format(self.opt.dataset))
 
     def test(self, x_test, y_test):
         x_test = torch.tensor(x_test, device=self.device, dtype=torch.float32)
