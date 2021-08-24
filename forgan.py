@@ -20,6 +20,8 @@ class ForGAN:
     def __init__(self, opt):
         self.opt = opt
         self.device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+
+        print(f"Use device: {self.device}")
         print("*****  Hyper-parameters  *****")
         for k, v in vars(opt).items():
             print("{}:\t{}".format(k, v))
@@ -91,6 +93,7 @@ class ForGAN:
             noise_batch = torch.tensor(rs.normal(0, 1, (self.opt.batch_size, self.opt.noise_size)), device=self.device,
                                        dtype=torch.float32)
             x_fake = self.generator(noise_batch, condition)
+            # print(x_fake)
             d_g_decision = self.discriminator(x_fake, condition)
             # Mackey-Glass works best with Minmax loss in our expriements while other dataset
             # produce their best result with non-saturated loss
@@ -126,8 +129,12 @@ class ForGAN:
                 }, "./{}/checkpoint.torch".format(self.opt.dataset))
 
     def test(self, x_test, y_test):
+        import os
         x_test = torch.tensor(x_test, device=self.device, dtype=torch.float32)
-        checkpoint = torch.load("./{}/best.torch".format(self.opt.dataset))
+        if os.path.isfile("./{}/best.torch".format(self.opt.dataset)):
+            checkpoint = torch.load("./{}/best.torch".format(self.opt.dataset), map_location=self.device)
+        else:
+            checkpoint = torch.load("./{}/checkpoint.torch".format(self.opt.dataset), map_location=self.device)
         self.generator.load_state_dict(checkpoint['g_state_dict'])
         y_test = y_test.flatten()
         preds = []
@@ -140,7 +147,6 @@ class ForGAN:
                                        dtype=torch.float32)
             pred = self.generator(noise_batch, x_test).detach().cpu().numpy().flatten()
             preds.append(pred)
-
             error = pred - y_test
             rmses.append(np.sqrt(np.square(error).mean()))
             maes.append(np.abs(error).mean())
@@ -182,16 +188,21 @@ if __name__ == '__main__':
                     help="Number of training iteration for discriminator")
     ap.add_argument("-hbin", metavar='', dest="hist_bins", type=int, default=80,
                     help="Number of histogram bins for calculating KLD")
-    ap.add_argument("-hmin", metavar='', dest="hist_min", type=float, default=-11,
+    ap.add_argument("-hmin", metavar='', dest="hist_min", type=float, default=None,
                     help="Min range of histogram for calculating KLD")
-    ap.add_argument("-hmax", metavar='', dest="hist_max", type=float, default=11,
+    ap.add_argument("-hmax", metavar='', dest="hist_max", type=float, default=None,
                     help="Max range of histogram for calculating KLD")
-
+    ap.add_argument("-type", metavar='', dest="train_type", type=str, default='train',
+                    help="train or test")
     opt = ap.parse_args()
 
     x_train, y_train, x_val, y_val, x_test, y_test = utils.prepare_dataset(opt.dataset, opt.condition_size)
     opt.data_mean = x_train.mean()
     opt.data_std = x_train.std()
     forgan = ForGAN(opt)
-    forgan.train(x_train, y_train, x_val, y_val)
-    forgan.test(x_test, y_test)
+    if opt.train_type == 'train':
+        forgan.train(x_train, y_train, x_val, y_val)
+        forgan.test(x_test, y_test)
+    else:
+        forgan.test(x_test, y_test)
+

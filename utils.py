@@ -5,8 +5,12 @@ import pandas as pd
 
 
 def calc_kld(generated_data, ground_truth, bins, range_min, range_max):
-    pd_gt, _ = np.histogram(ground_truth, bins=bins, density=True, range=(range_min, range_max))
-    pd_gen, _ = np.histogram(generated_data, bins=bins, density=True, range=(range_min, range_max))
+    if range_min and range_max: 
+        pd_gt, _ = np.histogram(ground_truth, bins=bins, range=(range_min, range_max), density=True)
+        pd_gen, _ = np.histogram(generated_data, bins=bins, range=(range_min, range_max), density=True)
+    else:
+        pd_gt, _ = np.histogram(ground_truth, bins=bins, density=True)
+        pd_gen, _ = np.histogram(generated_data, bins=bins, density=True)
     kld = 0
     for x1, x2 in zip(pd_gt, pd_gen):
         if x1 != 0 and x2 == 0:

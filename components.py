@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 
-
 class Generator(nn.Module):
     def __init__(self, noise_size, condition_size, generator_latent_size, cell_type, mean=0, std=1):
         super().__init__()

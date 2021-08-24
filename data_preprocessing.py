@@ -36,4 +36,9 @@ def plot_data():
 
 
 if __name__ == '__main__':
-    plot_data()
+    # plot_data()
+    import numpy as np
+    aqm = pd.read_csv("Data/aqmes1_part.csv", header=0)
+    index = aqm['PM2_5'].index[aqm['PM2_5'].apply(np.isnan)]
+    index_calib = aqm['PM2_5_cal'].index[aqm['PM2_5_cal'].apply(np.isnan)]
+    print(f'index for pm: {index}, pm_calib: {index_calib}')
