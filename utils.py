@@ -36,7 +36,7 @@ def prepare_dataset(dataset, condition_size=None):
     elif dataset == "mg":
         raw_dataset = pd.read_csv("./datasets/mg/MackyG17.csv")
         raw_dataset = np.transpose(raw_dataset.values)[0]
-
+        print(raw_dataset.shape)
         x = [raw_dataset[i - condition_size:i] for i in range(condition_size, raw_dataset.shape[0])]
         x = np.array(x)
         y = raw_dataset[condition_size:]
@@ -63,4 +63,33 @@ def prepare_dataset(dataset, condition_size=None):
         x_test = x[int(x.shape[0] * 0.6):]
         y_test = y[int(x.shape[0] * 0.6):]
 
+    elif dataset == 'aqm':
+        raw_dataset = pd.read_csv('./Data/aqmes1_part.csv', header=0)
+        pm25_raw = np.transpose(raw_dataset['PM2_5'].values)
+        pm25_calib = np.transpose(raw_dataset['PM2_5_cal'].values)
+        print(pm25_raw.shape)
+
+        x = []
+        for i in range(condition_size, pm25_calib.shape[0]):
+            x_i = pm25_calib[i - condition_size:i]
+            x_i = np.hstack((x_i, pm25_raw[i]))
+            x.append(x_i)
+
+        x = np.array(x)
+        y = pm25_calib[condition_size:]
+
+        x_train = x[:int(x.shape[0] * 0.5)]
+        y_train = y[:int(x.shape[0] * 0.5)]
+        x_val = x[int(x.shape[0] * 0.5):int(x.shape[0] * 0.6)]
+        y_val = y[int(x.shape[0] * 0.5):int(x.shape[0] * 0.6)]
+        x_test = x[int(x.shape[0] * 0.6):]
+        y_test = y[int(x.shape[0] * 0.6):]
     return x_train, y_train, x_val, y_val, x_test, y_test
+
+
+if __name__ == '__main__':
+    x_train, y_train, x_val, y_val, x_test, y_test = prepare_dataset('mg', condition_size=6)
+    print(x_train.shape)
+    x_train, y_train, x_val, y_val, x_test, y_test = prepare_dataset('aqm', condition_size=6)
+    print(x_train.shape)
+    print(y_train.shape)

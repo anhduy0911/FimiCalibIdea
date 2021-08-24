@@ -6,6 +6,7 @@ import torch
 import utils
 from components import Generator, Discriminator
 from torch import nn
+from tqdm import tqdm
 
 # Fixing random seeds
 torch.manual_seed(1368)
@@ -59,7 +60,7 @@ class ForGAN:
         adversarial_loss = nn.BCELoss()
         adversarial_loss = adversarial_loss.to(self.device)
 
-        for step in range(self.opt.n_steps):
+        for step in tqdm(range(self.opt.n_steps)):
             d_loss = 0
             for _ in range(self.opt.d_iter):
                 # train discriminator on real data
@@ -93,7 +94,7 @@ class ForGAN:
             d_g_decision = self.discriminator(x_fake, condition)
             # Mackey-Glass works best with Minmax loss in our expriements while other dataset
             # produce their best result with non-saturated loss
-            if opt.dataset == "mg":
+            if opt.dataset == "mg" or opt.dataset == 'aqm':
                 g_loss = adversarial_loss(d_g_decision, torch.full_like(d_g_decision, 1, device=self.device))
             else:
                 g_loss = -1 * adversarial_loss(d_g_decision, torch.full_like(d_g_decision, 0, device=self.device))

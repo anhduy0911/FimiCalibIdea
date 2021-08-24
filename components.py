@@ -7,7 +7,7 @@ class Generator(nn.Module):
         super().__init__()
 
         self.noise_size = noise_size
-        self.condition_size = condition_size
+        self.condition_size = condition_size + 1
         self.generator_latent_size = generator_latent_size
         self.mean = mean
         self.std = std
@@ -47,7 +47,7 @@ class Discriminator(nn.Module):
     def __init__(self, condition_size, discriminator_latent_size, cell_type, mean=0, std=1):
         super().__init__()
         self.discriminator_latent_size = discriminator_latent_size
-        self.condition_size = condition_size
+        self.condition_size = condition_size + 1
         self.mean = mean
         self.std = std
 
@@ -64,9 +64,10 @@ class Discriminator(nn.Module):
         )
 
     def forward(self, prediction, condition):
-        d_input = torch.cat((condition, prediction.view(-1, 1)), dim=1)
+        d_input = torch.cat((condition[:, :-1], prediction.view(-1, 1)), dim=1)
+       
         d_input = (d_input - self.mean) / self.std
-        d_input = d_input.view(-1, self.condition_size + 1, 1)
+        d_input = d_input.view(-1, self.condition_size, 1)
         d_input = d_input.transpose(0, 1)
         d_latent, _ = self.input_to_latent(d_input)
         d_latent = d_latent[-1]
