@@ -3,17 +3,54 @@ import os
 
 import numpy as np
 import torch
+from torch.utils.data import DataLoader
+from torch.utils.data.dataset import TensorDataset
 import utils
-from components import Generator, Discriminator
 from torch import nn
 from tqdm import tqdm
 import pandas as pd
+
 # Fixing random seeds
 torch.manual_seed(1368)
 rs = np.random.RandomState(1368)
 YELLOW_TEXT = '\033[93m'
 ENDC = '\033[0m'
 BOLD = '\033[1m'
+
+class Generator(nn.Module):
+    def __init__(self, condition_size, generator_latent_size, cell_type, mean=0, std=1):
+        super().__init__()
+
+        self.condition_size = condition_size + 1
+        self.generator_latent_size = generator_latent_size
+        self.mean = mean
+        self.std = std
+
+        if cell_type == "lstm":
+            self.cond_to_latent = nn.LSTM(input_size=1,
+                                          hidden_size=generator_latent_size)
+        else:
+            self.cond_to_latent = nn.GRU(input_size=1,
+                                         hidden_size=generator_latent_size)
+
+        self.model = nn.Sequential(
+            nn.Linear(in_features=generator_latent_size,
+                      out_features=generator_latent_size),
+            nn.ReLU(),
+            nn.Linear(in_features=generator_latent_size, out_features=1)
+        )
+
+    def forward(self, condition):
+        condition = (condition - self.mean) / self.std
+        condition = condition.view(-1, self.condition_size, 1)
+        condition = condition.transpose(0, 1)
+        condition_latent, _ = self.cond_to_latent(condition)
+        condition_latent = condition_latent[-1]
+        g_input = condition_latent
+        output = self.model(g_input)
+        output = output * self.std + self.mean
+
+        return output
 
 
 class ForGAN:
@@ -32,103 +69,54 @@ class ForGAN:
         os.makedirs("./{}/".format(self.opt.dataset), exist_ok=True)
 
         # Defining GAN components
-        self.generator = Generator(noise_size=opt.noise_size,
-                                   condition_size=opt.condition_size,
+        self.generator = Generator(condition_size=opt.condition_size,
                                    generator_latent_size=opt.generator_latent_size,
                                    cell_type=opt.cell_type,
                                    mean=opt.data_mean,
                                    std=opt.data_std)
 
-        self.discriminator = Discriminator(condition_size=opt.condition_size,
-                                           discriminator_latent_size=opt.discriminator_latent_size,
-                                           cell_type=opt.cell_type,
-                                           mean=opt.data_mean,
-                                           std=opt.data_std)
-
         self.generator = self.generator.to(self.device)
-        self.discriminator = self.discriminator.to(self.device)
         print("\nNetwork Architecture\n")
         print(self.generator)
-        print(self.discriminator)
         print("\n************************\n")
 
     def train(self, x_train, y_train, x_val, y_val):
         x_train = torch.tensor(x_train, device=self.device, dtype=torch.float32)
         y_train = torch.tensor(y_train, device=self.device, dtype=torch.float32)
+
+        dts = TensorDataset(x_train, y_train)
+        dtloader = DataLoader(dts, batch_size=self.opt.batch_size, shuffle=True)
+
         x_val = torch.tensor(x_val, device=self.device, dtype=torch.float32)
         best_kld = np.inf
         best_rmse = np.inf
         best_mae = np.inf
         optimizer_g = torch.optim.RMSprop(self.generator.parameters(), lr=self.opt.lr)
-        optimizer_d = torch.optim.RMSprop(self.discriminator.parameters(), lr=self.opt.lr)
-        adversarial_loss = nn.BCELoss()
+        adversarial_loss = nn.MSELoss()
         adversarial_loss = adversarial_loss.to(self.device)
 
         for step in tqdm(range(self.opt.n_steps)):
-            d_loss = 0
-            for _ in range(self.opt.d_iter):
-                # train discriminator on real data
-                idx = rs.choice(x_train.shape[0], self.opt.batch_size)
-                condition = x_train[idx]
-                real_data = y_train[idx]
-                self.discriminator.zero_grad()
-                d_real_decision = self.discriminator(real_data, condition)
-                d_real_loss = adversarial_loss(d_real_decision,
-                                               torch.full_like(d_real_decision, 1, device=self.device))
-                d_real_loss.backward()
-                d_loss += d_real_loss.detach().cpu().numpy()
-                # train discriminator on fake data
-                noise_batch = torch.tensor(rs.normal(0, 1, (condition.size(0), self.opt.noise_size)),
-                                           device=self.device, dtype=torch.float32)
-                x_fake = self.generator(noise_batch, condition).detach()
-                d_fake_decision = self.discriminator(x_fake, condition)
-                d_fake_loss = adversarial_loss(d_fake_decision,
-                                               torch.full_like(d_fake_decision, 0, device=self.device))
-                d_fake_loss.backward()
-
-                optimizer_d.step()
-                d_loss += d_fake_loss.detach().cpu().numpy()
-
-            d_loss = d_loss / (2 * self.opt.d_iter)
-
-            self.generator.zero_grad()
-            noise_batch = torch.tensor(rs.normal(0, 1, (self.opt.batch_size, self.opt.noise_size)), device=self.device,
-                                       dtype=torch.float32)
-            x_fake = self.generator(noise_batch, condition)
-            # print(x_fake)
-            d_g_decision = self.discriminator(x_fake, condition)
-            # Mackey-Glass works best with Minmax loss in our expriements while other dataset
-            # produce their best result with non-saturated loss
-            if opt.dataset == "mg" or opt.dataset == 'aqm':
-                g_loss = adversarial_loss(d_g_decision, torch.full_like(d_g_decision, 1, device=self.device))
-            else:
-                g_loss = -1 * adversarial_loss(d_g_decision, torch.full_like(d_g_decision, 0, device=self.device))
-            g_loss.backward()
-            optimizer_g.step()
-
-            g_loss = g_loss.detach().cpu().numpy()
-
+            g_loss = None
+            for idx, (condition, y_truth) in enumerate(dtloader):
+                self.generator.zero_grad()
+                x_fake = self.generator(condition)
+                g_loss_i = adversarial_loss(x_fake, y_truth)
+                g_loss_i.backward()
+                optimizer_g.step()
+                if idx == 0:
+                    g_loss = g_loss_i.detach().cpu().numpy()
+                else:
+                    g_loss += g_loss_i.detach().cpu().numpy()
             # Validation
-            noise_batch = torch.tensor(rs.normal(0, 1, (x_val.size(0), self.opt.noise_size)), device=self.device,
-                                       dtype=torch.float32)
-            preds = self.generator(noise_batch, x_val).detach().cpu().numpy().flatten()
+            preds = self.generator(x_val).detach().cpu().numpy().flatten()
 
-            kld = utils.calc_kld(preds, y_val, self.opt.hist_bins, self.opt.hist_min, self.opt.hist_max)
             rmse =  np.sqrt(np.square(preds - y_val).mean())
             mae = np.abs(preds - y_val).mean()
 
-            if self.opt.metric == 'kld': 
-                if kld <= best_kld and kld != np.inf:
-                    best_kld = kld
-                    print("step : {} , KLD : {}, RMSE : {}, MAE: {}".format(step, best_kld,
-                                                                rmse, mae))
-                    torch.save({
-                        'g_state_dict': self.generator.state_dict()
-                    }, "./{}/best.torch".format(self.opt.dataset))
-            elif self.opt.metric == 'rmse':
+            if self.opt.metric == 'rmse':
                 if rmse <= best_rmse and rmse != np.inf:
                     best_rmse = rmse
-                    print("step : {} , KLD : {}, RMSE : {}, MAE: {}".format(step, kld,
+                    print("step : {}, RMSE : {}, MAE: {}".format(step,
                                                                 rmse, mae))
                     torch.save({
                         'g_state_dict': self.generator.state_dict()
@@ -136,57 +124,42 @@ class ForGAN:
             else:
                 if mae <= best_mae and mae != np.inf:
                     best_mae = mae
-                    print("step : {} , KLD : {}, RMSE : {}, MAE: {}".format(step, kld,
+                    print("step : {} , RMSE : {}, MAE: {}".format(step,
                                                                 rmse, mae))
                     torch.save({
                         'g_state_dict': self.generator.state_dict()
-                    }, "./{}/best.torch".format(self.opt.dataset))
+                    }, "./{}/best_gen.torch".format(self.opt.dataset))
 
             if step % 100 == 0:
-                print(YELLOW_TEXT + BOLD + "step : {} , d_loss : {} , g_loss : {}".format(step, d_loss, g_loss) + ENDC)
+                print(YELLOW_TEXT + BOLD + "step : {} , g_loss : {}".format(step, g_loss) + ENDC)
                 torch.save({
                     'g_state_dict': self.generator.state_dict(), 
-                    'd_state_dict': self.discriminator.state_dict(), 
-                }, "./{}/checkpoint.torch".format(self.opt.dataset))
+                }, "./{}/checkpoint_gen.torch".format(self.opt.dataset))
 
     def test(self, x_test, y_test, load_best=True):
         import os
         import matplotlib.pyplot as plt
         x_test = torch.tensor(x_test, device=self.device, dtype=torch.float32)
         if os.path.isfile("./{}/best.torch".format(self.opt.dataset)) and load_best:
-            checkpoint = torch.load("./{}/best.torch".format(self.opt.dataset), map_location=self.device)
+            checkpoint = torch.load("./{}/best_gen.torch".format(self.opt.dataset), map_location=self.device)
         else:
-            checkpoint = torch.load("./{}/checkpoint.torch".format(self.opt.dataset), map_location=self.device)
+            checkpoint = torch.load("./{}/checkpoint_gen.torch".format(self.opt.dataset), map_location=self.device)
         self.generator.load_state_dict(checkpoint['g_state_dict'])
         y_test = y_test.flatten()
-        print(y_test.shape)
-        preds = []
-        rmses = []
-        maes = []
-        mapes = []
 
-        for _ in range(200):
-            noise_batch = torch.tensor(rs.normal(0, 1, (x_test.size(0), self.opt.noise_size)), device=self.device,
-                                       dtype=torch.float32)
-            pred = self.generator(noise_batch, x_test).detach().cpu().numpy().flatten()
-            preds.append(pred)
-            error = pred - y_test
-            rmses.append(np.sqrt(np.square(error).mean()))
-            maes.append(np.abs(error).mean())
-            mapes.append(np.abs(error / y_test).mean() * 100)
-        preds = np.vstack(preds)    
-        crps = np.absolute(preds[:100] - y_test).mean() - 0.5 * np.absolute(preds[:100] - preds[100:]).mean()
-        preds_mean = np.mean(preds, axis=0)
-        preds = preds.flatten()
-        print(preds_mean.shape) 
-        before_calib = pd.read_csv('Data/aqmes1_part.csv', header=0)['PM2_5'].values
-        before_calib = before_calib[int(before_calib.shape[0] * 0.6):]
-        print(before_calib.shape)
+        pred = self.generator(x_test).detach().cpu().numpy().flatten()
+        error = pred - y_test
+        rmse = np.sqrt(np.square(error).mean())
+        mae = np.abs(error).mean()
+        mape = np.abs(error / y_test).mean() * 100
 
         fig, (ax1, ax2) = plt.subplots(1, 2)
         fig.set_figheight(8)
         fig.set_figwidth(22)
         fig.suptitle('PM2.5')
+
+        before_calib = pd.read_csv('Data/aqmes1_part.csv', header=0)['PM2_5'].values
+        before_calib = before_calib[int(before_calib.shape[0] * 0.6):]
 
         ax1.plot(y_test, label='Real')
         ax1.plot(before_calib, label='Raw')
@@ -194,19 +167,16 @@ class ForGAN:
         ax1.legend()
 
         ax2.plot(y_test, label='Real')
-        ax2.plot(preds_mean, label='Prediction')
+        ax2.plot(pred, label='Prediction')
         ax2.set_title("After calibration")
         ax2.legend()
-        fig.savefig('img/forgan.png')
+        fig.savefig('img/generator.png')
 
-        kld = utils.calc_kld(preds, y_test, self.opt.hist_bins, self.opt.hist_min, self.opt.hist_max)
-        print("Test resuts:\nRMSE : {}({})\nMAE : {}({})\nMAPE : {}({}) %\nCRPS : {}\nKLD : {}\n"
-              .format(np.mean(rmses), np.std(rmses),
-                      np.mean(maes), np.std(maes),
-                      np.mean(mapes), np.std(mapes),
-                      crps,
-                      kld))
-
+        print("Test resuts:\nRMSE : {}\nMAE : {}\nMAPE : {} %\nCRPS : {}\n"
+              .format(np.mean(rmse),
+                      np.mean(mae),
+                      np.mean(mape),
+                      mae))
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
