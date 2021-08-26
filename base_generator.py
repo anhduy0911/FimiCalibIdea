@@ -120,7 +120,7 @@ class ForGAN:
                                                                 rmse, mae))
                     torch.save({
                         'g_state_dict': self.generator.state_dict()
-                    }, "./{}/best.torch".format(self.opt.dataset))
+                    }, "./{}/best_gen.torch".format(self.opt.dataset))
             else:
                 if mae <= best_mae and mae != np.inf:
                     best_mae = mae
