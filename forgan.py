@@ -62,7 +62,10 @@ class ForGAN:
         optimizer_g = torch.optim.RMSprop(self.generator.parameters(), lr=self.opt.lr)
         optimizer_d = torch.optim.RMSprop(self.discriminator.parameters(), lr=self.opt.lr)
         adversarial_loss = nn.BCELoss()
+        generator_loss = nn.MSELoss()
+
         adversarial_loss = adversarial_loss.to(self.device)
+        generator_loss = generator_loss.to(self.device)
 
         for step in tqdm(range(self.opt.n_steps)):
             d_loss = 0
@@ -103,10 +106,14 @@ class ForGAN:
                 g_loss = adversarial_loss(d_g_decision, torch.full_like(d_g_decision, 1, device=self.device))
             else:
                 g_loss = -1 * adversarial_loss(d_g_decision, torch.full_like(d_g_decision, 0, device=self.device))
-            g_loss.backward()
+            
+            g_loss_mse = generator_loss(x_fake, real_data)
+            g_loss_tot = g_loss_mse * step / self.opt.n_steps + g_loss * (1 - step / self.opt.n_steps)
+            g_loss_tot.backward()
             optimizer_g.step()
 
             g_loss = g_loss.detach().cpu().numpy()
+            g_loss_mse = g_loss_mse.detach().cpu().numpy()
 
             # Validation
             noise_batch = torch.tensor(rs.normal(0, 1, (x_val.size(0), self.opt.noise_size)), device=self.device,
@@ -143,7 +150,7 @@ class ForGAN:
                     }, "./{}/best.torch".format(self.opt.dataset))
 
             if step % 100 == 0:
-                print(YELLOW_TEXT + BOLD + "step : {} , d_loss : {} , g_loss : {}".format(step, d_loss, g_loss) + ENDC)
+                print(YELLOW_TEXT + BOLD + "step : {} , d_loss : {} , g_loss : {}, g_loss_mse: {}".format(step, d_loss, g_loss, g_loss_mse) + ENDC)
                 torch.save({
                     'g_state_dict': self.generator.state_dict(), 
                     'd_state_dict': self.discriminator.state_dict(), 
