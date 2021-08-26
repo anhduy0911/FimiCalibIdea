@@ -45,6 +45,8 @@ class ForGAN:
                                            mean=opt.data_mean,
                                            std=opt.data_std)
 
+        self.es = utils.EarlyStopping(self.opt.early_stop)
+
         self.generator = self.generator.to(self.device)
         self.discriminator = self.discriminator.to(self.device)
         print("\nNetwork Architecture\n")
@@ -108,7 +110,7 @@ class ForGAN:
                 g_loss = -1 * adversarial_loss(d_g_decision, torch.full_like(d_g_decision, 0, device=self.device))
             
             g_loss_mse = generator_loss(x_fake, real_data)
-            g_loss_tot = g_loss_mse * step / self.opt.n_steps + g_loss * (1 - step / self.opt.n_steps)
+            g_loss_tot = g_loss_mse * (1 - step / self.opt.n_steps) + g_loss * (step / self.opt.n_steps)
             g_loss_tot.backward()
             optimizer_g.step()
 
@@ -125,6 +127,9 @@ class ForGAN:
             mae = np.abs(preds - y_val).mean()
 
             if self.opt.metric == 'kld': 
+                self.es(kld)
+                if self.es.early_stop:
+                    break
                 if kld <= best_kld and kld != np.inf:
                     best_kld = kld
                     print("step : {} , KLD : {}, RMSE : {}, MAE: {}".format(step, best_kld,
@@ -133,6 +138,9 @@ class ForGAN:
                         'g_state_dict': self.generator.state_dict()
                     }, "./{}/best.torch".format(self.opt.dataset))
             elif self.opt.metric == 'rmse':
+                self.es(rmse)
+                if self.es.early_stop:
+                    break
                 if rmse <= best_rmse and rmse != np.inf:
                     best_rmse = rmse
                     print("step : {} , KLD : {}, RMSE : {}, MAE: {}".format(step, kld,
@@ -141,6 +149,9 @@ class ForGAN:
                         'g_state_dict': self.generator.state_dict()
                     }, "./{}/best.torch".format(self.opt.dataset))
             else:
+                self.es(mae)
+                if self.es.early_stop:
+                    break
                 if mae <= best_mae and mae != np.inf:
                     best_mae = mae
                     print("step : {} , KLD : {}, RMSE : {}, MAE: {}".format(step, kld,
@@ -250,6 +261,8 @@ if __name__ == '__main__':
                     help="load best or checkpoint model")
     ap.add_argument("-metric", metavar='', dest="metric", type=str, default='kld',
                     help="metric to save best model - mae or rmse or kld")
+    ap.add_argument("-es", metavar='', dest="early_stop", type=int, default=500,
+                    help="early stopping patience")
     opt = ap.parse_args()
 
     x_train, y_train, x_val, y_val, x_test, y_test = utils.prepare_dataset(opt.dataset, opt.condition_size)
