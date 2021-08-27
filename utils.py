@@ -25,6 +25,7 @@ class EarlyStopping():
             self.best_loss = val_loss
         elif self.best_loss - val_loss > self.min_delta:
             self.best_loss = val_loss
+            self.counter = 0
         elif self.best_loss - val_loss < self.min_delta:
             self.counter += 1
             print(f"INFO: Early stopping counter {self.counter} of {self.patience}")
@@ -102,26 +103,35 @@ def prepare_dataset(dataset, condition_size=None):
         print(pm25_raw.shape)
 
         x = []
+        x2 = []
         for i in range(condition_size, pm25_calib.shape[0]):
             x_i = pm25_calib[i - condition_size:i]
             x_i = np.hstack((x_i, pm25_raw[i]))
             x.append(x_i)
+            x2.append(np.vstack((x_i, pm25_raw[i - condition_size: i + 1])))
 
         x = np.array(x)
+        x2 = np.array(x2)
         y = pm25_calib[condition_size:]
 
         x_train = x[:int(x.shape[0] * 0.5)]
+        x_train2 = x2[:int(x.shape[0] * 0.5)]
         y_train = y[:int(x.shape[0] * 0.5)]
         x_val = x[int(x.shape[0] * 0.5):int(x.shape[0] * 0.6)]
+        x_val2 = x2[int(x.shape[0] * 0.5):int(x.shape[0] * 0.6)]
         y_val = y[int(x.shape[0] * 0.5):int(x.shape[0] * 0.6)]
         x_test = x[int(x.shape[0] * 0.6):]
+        x_test2 = x2[int(x.shape[0] * 0.6):]
         y_test = y[int(x.shape[0] * 0.6):]
+        return x_train, x_train2, y_train, x_val, x_val2, y_val, x_test, x_test2, y_test
+    
     return x_train, y_train, x_val, y_val, x_test, y_test
 
 
 if __name__ == '__main__':
     x_train, y_train, x_val, y_val, x_test, y_test = prepare_dataset('mg', condition_size=6)
     print(x_train.shape)
-    x_train, y_train, x_val, y_val, x_test, y_test = prepare_dataset('aqm', condition_size=6)
+    x_train, x_train2, y_train, x_val, x_val2, y_val, x_test, x_test2, y_test = prepare_dataset('aqm', condition_size=6)
     print(x_train.shape)
+    print(x_train2.shape)
     print(y_train.shape)

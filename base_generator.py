@@ -26,11 +26,12 @@ class Generator(nn.Module):
         self.mean = mean
         self.std = std
 
+        self.conv_1d = nn.Conv1d(in_channels=2, out_channels=generator_latent_size, kernel_size=3)
         if cell_type == "lstm":
-            self.cond_to_latent = nn.LSTM(input_size=1,
+            self.cond_to_latent = nn.LSTM(input_size=6,
                                           hidden_size=generator_latent_size)
         else:
-            self.cond_to_latent = nn.GRU(input_size=1,
+            self.cond_to_latent = nn.GRU(input_size=6,
                                          hidden_size=generator_latent_size)
 
         self.model = nn.Sequential(
@@ -76,6 +77,7 @@ class ForGAN:
                                    std=opt.data_std)
 
         self.generator = self.generator.to(self.device)
+        self.es = utils.EarlyStopping(patience=self.opt.early_stop)
         print("\nNetwork Architecture\n")
         print(self.generator)
         print("\n************************\n")
@@ -91,7 +93,7 @@ class ForGAN:
         best_kld = np.inf
         best_rmse = np.inf
         best_mae = np.inf
-        optimizer_g = torch.optim.RMSprop(self.generator.parameters(), lr=self.opt.lr)
+        optimizer_g = torch.optim.Adam(self.generator.parameters(), lr=self.opt.lr)
         adversarial_loss = nn.MSELoss()
         adversarial_loss = adversarial_loss.to(self.device)
 
@@ -100,7 +102,7 @@ class ForGAN:
             for idx, (condition, y_truth) in enumerate(dtloader):
                 self.generator.zero_grad()
                 x_fake = self.generator(condition)
-                g_loss_i = adversarial_loss(x_fake, y_truth)
+                g_loss_i = adversarial_loss(x_fake, y_truth.view(-1,1))
                 g_loss_i.backward()
                 optimizer_g.step()
                 if idx == 0:
@@ -114,6 +116,9 @@ class ForGAN:
             mae = np.abs(preds - y_val).mean()
 
             if self.opt.metric == 'rmse':
+                self.es(rmse)
+                if self.es.early_stop:
+                    break
                 if rmse <= best_rmse and rmse != np.inf:
                     best_rmse = rmse
                     print("step : {}, RMSE : {}, MAE: {}".format(step,
@@ -122,6 +127,9 @@ class ForGAN:
                         'g_state_dict': self.generator.state_dict()
                     }, "./{}/best_gen.torch".format(self.opt.dataset))
             else:
+                self.es(mae)
+                if self.es.early_stop:
+                    break
                 if mae <= best_mae and mae != np.inf:
                     best_mae = mae
                     print("step : {} , RMSE : {}, MAE: {}".format(step,
@@ -213,14 +221,16 @@ if __name__ == '__main__':
                     help="load best or checkpoint model")
     ap.add_argument("-metric", metavar='', dest="metric", type=str, default='kld',
                     help="metric to save best model - mae or rmse or kld")
+    ap.add_argument("-es", metavar='', dest="early_stop", type=int, default=1000,
+                    help="early stopping patience")
     opt = ap.parse_args()
 
-    x_train, y_train, x_val, y_val, x_test, y_test = utils.prepare_dataset(opt.dataset, opt.condition_size)
+    x_train, x_train2, y_train, x_val, x_val2, y_val, x_test, x_test2, y_test = utils.prepare_dataset(opt.dataset, opt.condition_size)
     opt.data_mean = x_train.mean()
     opt.data_std = x_train.std()
     forgan = ForGAN(opt)
     if opt.train_type == 'train':
-        forgan.train(x_train, y_train, x_val, y_val)
+        forgan.train(x_train2, y_train, x_val2, y_val)
         forgan.test(x_test, y_test, opt.load_best)
     else:
         forgan.test(x_test, y_test, opt.load_best)

@@ -102,6 +102,7 @@ class ForGAN:
             x_fake = self.generator(noise_batch, condition)
             # print(x_fake)
             d_g_decision = self.discriminator(x_fake, condition)
+            d_decision_real = self.discriminator(real_data, condition)
             # Mackey-Glass works best with Minmax loss in our expriements while other dataset
             # produce their best result with non-saturated loss
             if opt.dataset == "mg" or opt.dataset == 'aqm':
@@ -109,13 +110,14 @@ class ForGAN:
             else:
                 g_loss = -1 * adversarial_loss(d_g_decision, torch.full_like(d_g_decision, 0, device=self.device))
             
-            g_loss_mse = generator_loss(x_fake, real_data)
-            g_loss_tot = g_loss_mse * (1 - step / self.opt.n_steps) + g_loss * (step / self.opt.n_steps)
+            d_decision_real = d_decision_real.detach()
+            g_loss_additional = adversarial_loss(d_g_decision, d_decision_real)
+            g_loss_tot = g_loss_additional * (step / self.opt.n_steps) + g_loss * (1 - step / self.opt.n_steps)
             g_loss_tot.backward()
             optimizer_g.step()
 
             g_loss = g_loss.detach().cpu().numpy()
-            g_loss_mse = g_loss_mse.detach().cpu().numpy()
+            g_loss_additional = g_loss_additional.detach().cpu().numpy()
 
             # Validation
             noise_batch = torch.tensor(rs.normal(0, 1, (x_val.size(0), self.opt.noise_size)), device=self.device,
@@ -161,7 +163,7 @@ class ForGAN:
                     }, "./{}/best.torch".format(self.opt.dataset))
 
             if step % 100 == 0:
-                print(YELLOW_TEXT + BOLD + "step : {} , d_loss : {} , g_loss : {}, g_loss_mse: {}".format(step, d_loss, g_loss, g_loss_mse) + ENDC)
+                print(YELLOW_TEXT + BOLD + "step : {} , d_loss : {} , g_loss : {}, g_loss_mse: {}".format(step, d_loss, g_loss, g_loss_additional) + ENDC)
                 torch.save({
                     'g_state_dict': self.generator.state_dict(), 
                     'd_state_dict': self.discriminator.state_dict(), 
@@ -261,11 +263,11 @@ if __name__ == '__main__':
                     help="load best or checkpoint model")
     ap.add_argument("-metric", metavar='', dest="metric", type=str, default='kld',
                     help="metric to save best model - mae or rmse or kld")
-    ap.add_argument("-es", metavar='', dest="early_stop", type=int, default=500,
+    ap.add_argument("-es", metavar='', dest="early_stop", type=int, default=1000,
                     help="early stopping patience")
     opt = ap.parse_args()
 
-    x_train, y_train, x_val, y_val, x_test, y_test = utils.prepare_dataset(opt.dataset, opt.condition_size)
+    x_train, x_train2, y_train, x_val, x_val2, y_val, x_test, x_test2, y_test = utils.prepare_dataset(opt.dataset, opt.condition_size)
     opt.data_mean = x_train.mean()
     opt.data_std = x_train.std()
     forgan = ForGAN(opt)
