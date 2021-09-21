@@ -28,7 +28,7 @@ class EarlyStopping():
             self.counter = 0
         elif self.best_loss - val_loss < self.min_delta:
             self.counter += 1
-            print(f"INFO: Early stopping counter {self.counter} of {self.patience}")
+            # print(f"INFO: Early stopping counter {self.counter} of {self.patience}")
             if self.counter >= self.patience:
                 print('INFO: Early stopping')
                 self.early_stop = True
@@ -98,21 +98,24 @@ def prepare_dataset(dataset, condition_size=None):
 
     elif dataset == 'aqm':
         raw_dataset = pd.read_csv('./Data/aqmes1_part.csv', header=0)
-        pm25_raw = np.transpose(raw_dataset['PM2_5'].values)
-        pm25_calib = np.transpose(raw_dataset['PM2_5_cal'].values)
-        print(pm25_raw.shape)
+        raw_cols = ['PM2_5', 'temp', 'humidity']
+        calib_cols = ['PM2_5_cal', 'temp_cal', 'humidity_cal']
+        data_raw = raw_dataset[raw_cols].values
+        data_calib = raw_dataset[calib_cols].values
+        print(data_raw.shape)
 
         x = []
         x2 = []
-        for i in range(condition_size, pm25_calib.shape[0]):
-            x_i = pm25_calib[i - condition_size:i]
-            x_i = np.hstack((x_i, pm25_raw[i]))
+        for i in range(condition_size, data_raw.shape[0]):
+            x_i = data_calib[i - condition_size:i, :]
+            # print(x_i.shape)
+            x_i = np.vstack((x_i, data_raw[i: i+1, :]))
             x.append(x_i)
-            x2.append(np.vstack((x_i, pm25_raw[i - condition_size: i + 1])))
+            x2.append(np.vstack((x_i, data_raw[i - condition_size: i + 1])))
 
         x = np.array(x)
         x2 = np.array(x2)
-        y = pm25_calib[condition_size:]
+        y = data_calib[condition_size:]
 
         x_train = x[:int(x.shape[0] * 0.5)]
         x_train2 = x2[:int(x.shape[0] * 0.5)]
@@ -129,9 +132,9 @@ def prepare_dataset(dataset, condition_size=None):
 
 
 if __name__ == '__main__':
-    x_train, y_train, x_val, y_val, x_test, y_test = prepare_dataset('mg', condition_size=6)
-    print(x_train.shape)
+    # x_train, y_train, x_val, y_val, x_test, y_test = prepare_dataset('mg', condition_size=6)
+    # print(x_train.shape)
     x_train, x_train2, y_train, x_val, x_val2, y_val, x_test, x_test2, y_test = prepare_dataset('aqm', condition_size=6)
     print(x_train.shape)
     print(x_train2.shape)
-    print(y_train.shape)
+    print(y_val.shape)

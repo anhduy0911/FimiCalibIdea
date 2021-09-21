@@ -113,7 +113,7 @@ class ForGAN:
             d_decision_real = d_decision_real.detach()
             g_loss_additional = adversarial_loss(d_g_decision, d_decision_real)
             g_loss_tot = g_loss_additional * (step / self.opt.n_steps) + g_loss * (1 - step / self.opt.n_steps)
-            g_loss_tot.backward()
+            g_loss.backward()
             optimizer_g.step()
 
             g_loss = g_loss.detach().cpu().numpy()

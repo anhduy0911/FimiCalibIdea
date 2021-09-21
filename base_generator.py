@@ -26,24 +26,30 @@ class Generator(nn.Module):
         self.mean = mean
         self.std = std
 
-        self.conv_1d = nn.Conv1d(in_channels=2, out_channels=generator_latent_size, kernel_size=3)
+        self.conv_1d = nn.Conv1d(in_channels=3, out_channels=generator_latent_size, kernel_size=3)
         if cell_type == "lstm":
             self.cond_to_latent = nn.LSTM(input_size=6,
-                                          hidden_size=generator_latent_size)
+                                          hidden_size=generator_latent_size,
+                                          num_layers=1,
+                                          bidirectional=True)
         else:
-            self.cond_to_latent = nn.GRU(input_size=6,
+            self.cond_to_latent = nn.GRU(input_size=3,
                                          hidden_size=generator_latent_size)
 
         self.model = nn.Sequential(
-            nn.Linear(in_features=generator_latent_size,
+            nn.Linear(in_features=generator_latent_size * 2,
                       out_features=generator_latent_size),
             nn.ReLU(),
-            nn.Linear(in_features=generator_latent_size, out_features=1)
+            nn.Linear(in_features=generator_latent_size, out_features=3)
         )
 
     def forward(self, condition):
         condition = (condition - self.mean) / self.std
-        condition = condition.view(-1, self.condition_size, 1)
+        # condition = condition.view(-1, self.condition_size, 2)
+        condition = condition.transpose(1, 2)
+        # print(condition.size())
+        condition = self.conv_1d(condition)
+        # print(condition.size())
         condition = condition.transpose(0, 1)
         condition_latent, _ = self.cond_to_latent(condition)
         condition_latent = condition_latent[-1]
@@ -102,7 +108,7 @@ class ForGAN:
             for idx, (condition, y_truth) in enumerate(dtloader):
                 self.generator.zero_grad()
                 x_fake = self.generator(condition)
-                g_loss_i = adversarial_loss(x_fake, y_truth.view(-1,1))
+                g_loss_i = adversarial_loss(x_fake.view(-1, 3), y_truth)
                 g_loss_i.backward()
                 optimizer_g.step()
                 if idx == 0:
@@ -110,7 +116,7 @@ class ForGAN:
                 else:
                     g_loss += g_loss_i.detach().cpu().numpy()
             # Validation
-            preds = self.generator(x_val).detach().cpu().numpy().flatten()
+            preds = self.generator(x_val).detach().cpu().numpy()
 
             rmse =  np.sqrt(np.square(preds - y_val).mean())
             mae = np.abs(preds - y_val).mean()
@@ -166,7 +172,7 @@ class ForGAN:
         fig.set_figwidth(22)
         fig.suptitle('PM2.5')
 
-        before_calib = pd.read_csv('Data/aqmes1_part.csv', header=0)['PM2_5'].values
+        before_calib = pd.read_csv('Data/aqmes1_part.csv', header=0)[['PM2_5', 'temp', 'humidity']].values.flatten()
         before_calib = before_calib[int(before_calib.shape[0] * 0.6):]
 
         ax1.plot(y_test, label='Real')
@@ -230,7 +236,7 @@ if __name__ == '__main__':
     opt.data_std = x_train.std()
     forgan = ForGAN(opt)
     if opt.train_type == 'train':
-        forgan.train(x_train2, y_train, x_val2, y_val)
+        forgan.train(x_train, y_train, x_val, y_val)
         forgan.test(x_test, y_test, opt.load_best)
     else:
         forgan.test(x_test, y_test, opt.load_best)
