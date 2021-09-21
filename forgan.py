@@ -77,8 +77,6 @@ class ForGAN:
                 idx = rs.choice(x_train.shape[0], self.opt.batch_size)
                 condition = x_train[idx]
                 real_data = y_train[idx]
-                print(condition.shape)
-                print(real_data.shape)
                 self.discriminator.zero_grad()
                 d_real_decision = self.discriminator(real_data, condition)
                 d_real_loss = adversarial_loss(d_real_decision,
@@ -125,7 +123,7 @@ class ForGAN:
             # Validation
             noise_batch = torch.tensor(rs.normal(0, 1, (x_val.size(0), self.opt.noise_size)), device=self.device,
                                        dtype=torch.float32)
-            preds = self.generator(noise_batch, x_val).detach().cpu().numpy().flatten()
+            preds = self.generator(noise_batch, x_val).detach().cpu().numpy()
 
             kld = utils.calc_kld(preds, y_val, self.opt.hist_bins, self.opt.hist_min, self.opt.hist_max)
             rmse =  np.sqrt(np.square(preds - y_val).mean())
@@ -268,9 +266,11 @@ if __name__ == '__main__':
                     help="metric to save best model - mae or rmse or kld")
     ap.add_argument("-es", metavar='', dest="early_stop", type=int, default=1000,
                     help="early stopping patience")
+    ap.add_argument("-raw", metavar='', dest="use_raw", type=bool, default=False,
+                    help="whether to use raw only for input of generator")
     opt = ap.parse_args()
 
-    x_train, x_train2, y_train, x_val, x_val2, y_val, x_test, x_test2, y_test = utils.prepare_dataset(opt.dataset, opt.condition_size)
+    x_train, x_train2, y_train, x_val, x_val2, y_val, x_test, x_test2, y_test = utils.prepare_dataset(opt.dataset, opt.condition_size, opt.use_raw)
     opt.data_mean = x_train.mean()
     opt.data_std = x_train.std()
     forgan = ForGAN(opt)
