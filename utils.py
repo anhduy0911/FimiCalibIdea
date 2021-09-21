@@ -97,7 +97,7 @@ def prepare_dataset(dataset, condition_size=None):
         y_test = y[int(x.shape[0] * 0.6):]
 
     elif dataset == 'aqm':
-        raw_dataset = pd.read_csv('./Data/aqmes1_part.csv', header=0)
+        raw_dataset = pd.read_csv('./Data/fimi/12_13.csv', header=0)
         raw_cols = ['PM2_5', 'temp', 'humidity']
         calib_cols = ['PM2_5_cal', 'temp_cal', 'humidity_cal']
         data_raw = raw_dataset[raw_cols].values

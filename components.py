@@ -25,7 +25,7 @@ class Generator(nn.Module):
             nn.Linear(in_features=generator_latent_size*2 + self.noise_size,
                       out_features=generator_latent_size + self.noise_size),
             nn.ReLU(),
-            nn.Linear(in_features=generator_latent_size + self.noise_size, out_features=1)
+            nn.Linear(in_features=generator_latent_size + self.noise_size, out_features=3)
 
         )
 
@@ -40,7 +40,7 @@ class Generator(nn.Module):
         condition_latent, _ = self.cond_to_latent(condition)
         condition_latent = condition_latent[-1]
         g_input = torch.cat((condition_latent, noise), dim=1)
-        print(g_input.shape())
+        # print(g_input.shape)
         output = self.model(g_input)
         output = output * self.std + self.mean
 
@@ -75,10 +75,10 @@ class Discriminator(nn.Module):
         )
 
     def forward(self, prediction, condition):
-        d_input = torch.cat((condition[:, :-1], prediction.view(-1, 3)), dim=1)
-        # print(d_input.size())
+        d_input = torch.cat((condition[:, :-1], prediction.view(-1, 1, 3)), dim=1)
         d_input = (d_input - self.mean) / self.std
-        d_input = d_input.view(-1, self.condition_size, 1)
+        # print(d_input.size())
+        d_input = d_input.view(-1, self.condition_size, 3)
         d_input = d_input.transpose(0, 1)
         d_latent, _ = self.input_to_latent(d_input)
         d_latent = d_latent[-1]

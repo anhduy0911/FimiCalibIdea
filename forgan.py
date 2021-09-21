@@ -2,6 +2,7 @@ import argparse
 import os
 
 import numpy as np
+from numpy.lib.type_check import real
 import torch
 import utils
 from components import Generator, Discriminator
@@ -76,6 +77,8 @@ class ForGAN:
                 idx = rs.choice(x_train.shape[0], self.opt.batch_size)
                 condition = x_train[idx]
                 real_data = y_train[idx]
+                print(condition.shape)
+                print(real_data.shape)
                 self.discriminator.zero_grad()
                 d_real_decision = self.discriminator(real_data, condition)
                 d_real_loss = adversarial_loss(d_real_decision,
