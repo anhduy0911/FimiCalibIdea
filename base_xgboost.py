@@ -164,5 +164,5 @@ def xgb_exp(data,seq_length_in,seq_length_out,option):
     fig.savefig('img/xgboost.png')
 
 if __name__ == '__main__':
-    aqm = pd.read_csv('Data/aqmes1_part.csv', header=0).values.T
+    aqm = pd.read_csv('Data/fimi/12_13.csv', header=0).values.T
     xgb_exp(aqm,32,1,0)
