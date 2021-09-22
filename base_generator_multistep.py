@@ -27,9 +27,9 @@ class Generator(nn.Module):
         self.mean = mean
         self.std = std
 
-        self.conv_1d = nn.Conv1d(in_channels=3, out_channels=generator_latent_size, kernel_size=3)
+        self.conv_1d = nn.Conv1d(in_channels=3, out_channels=generator_latent_size, kernel_size=3, padding=1)
         if cell_type == "lstm":
-            self.cond_to_latent = nn.LSTM(input_size=6,
+            self.cond_to_latent = nn.LSTM(input_size=self.condition_size,
                                           hidden_size=generator_latent_size,
                                           num_layers=1,
                                           bidirectional=True)
@@ -62,16 +62,16 @@ class Generator(nn.Module):
         condition = condition.transpose(1, 2)
         # print(condition.size())
         condition = self.conv_1d(condition)
-        print(condition.size())
+        # print(condition.size())
         condition = condition.transpose(0, 1)
         condition_latent, _ = self.cond_to_latent(condition)
         # condition_latent = condition_latent[-1]
         g_input = condition_latent
-        print(g_input.size())
+        # print(g_input.size())
         output, _ = self.latent_to_pred(g_input)
         output = output.transpose(0,1)
         output = self.model(output)
-        print(output.size())
+        # print(output.size())
         output = output * self.std + self.mean
     
         return output
