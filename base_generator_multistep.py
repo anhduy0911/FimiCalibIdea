@@ -18,10 +18,11 @@ ENDC = '\033[0m'
 BOLD = '\033[1m'
 
 class Generator(nn.Module):
-    def __init__(self, condition_size, generator_latent_size, cell_type, mean=0, std=1):
+    def __init__(self, condition_size, prediction_size, generator_latent_size, cell_type, mean=0, std=1):
         super().__init__()
 
         self.condition_size = condition_size + 1
+        self.prediction_size = prediction_size + 1
         self.generator_latent_size = generator_latent_size
         self.mean = mean
         self.std = std
@@ -42,6 +43,11 @@ class Generator(nn.Module):
             self.latent_to_pred = nn.GRU(input_size=generator_latent_size,
                                          hidden_size=3)
 
+        self.model = nn.Sequential(
+            nn.ReLU(),
+            nn.Conv1d(in_channels=generator_latent_size, out_channels=self.prediction_size, kernel_size=3, padding=1)
+        )
+        
         # self.model = nn.Sequential(
         #     nn.Linear(in_features=generator_latent_size * 2,
         #               out_features=generator_latent_size),
@@ -56,14 +62,16 @@ class Generator(nn.Module):
         condition = condition.transpose(1, 2)
         # print(condition.size())
         condition = self.conv_1d(condition)
-        # print(condition.size())
+        print(condition.size())
         condition = condition.transpose(0, 1)
         condition_latent, _ = self.cond_to_latent(condition)
         # condition_latent = condition_latent[-1]
         g_input = condition_latent
+        print(g_input.size())
         output, _ = self.latent_to_pred(g_input)
-        output = output[-self.condition_size:].transpose(0,1)
-        # print(output.size())
+        output = output.transpose(0,1)
+        output = self.model(output)
+        print(output.size())
         output = output * self.std + self.mean
     
         return output
@@ -86,6 +94,7 @@ class ForGAN:
 
         # Defining GAN components
         self.generator = Generator(condition_size=opt.condition_size,
+                                    prediction_size= opt.prediction_size,
                                    generator_latent_size=opt.generator_latent_size,
                                    cell_type=opt.cell_type,
                                    mean=opt.data_mean,
@@ -218,6 +227,8 @@ if __name__ == '__main__':
                     help="The size of Noise of Vector")
     ap.add_argument("-c", metavar='', dest="condition_size", type=int, default=24,
                     help="The size of look-back window ( Condition )")
+    ap.add_argument("-p", metavar='', dest="prediction_size", type=int, default=4,
+                    help="The size of prediction")
     ap.add_argument("-rg", metavar='', dest="generator_latent_size", type=int, default=8,
                     help="The number of cells in generator")
     ap.add_argument("-rd", metavar='', dest="discriminator_latent_size", type=int, default=64,
@@ -244,7 +255,7 @@ if __name__ == '__main__':
                     help="whether to calib multiple step")
     opt = ap.parse_args()
 
-    x_train, x_train2, y_train, x_val, x_val2, y_val, x_test, x_test2, y_test = utils.prepare_dataset(opt.dataset, opt.condition_size, opt.use_raw, opt.multistep)
+    x_train, x_train2, y_train, x_val, x_val2, y_val, x_test, x_test2, y_test = utils.prepare_dataset(opt.dataset, opt.condition_size, opt.prediction_size, opt.use_raw, opt.multistep)
     opt.data_mean = x_train.mean()
     opt.data_std = x_train.std()
     forgan = ForGAN(opt)
