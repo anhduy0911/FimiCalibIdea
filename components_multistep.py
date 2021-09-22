@@ -84,10 +84,10 @@ class Discriminator(nn.Module):
         )
 
     def forward(self, prediction, condition):
-        print(condition.shape)
-        print(prediction.shape)
+        # print(condition.shape)
+        # print(prediction.shape)
         d_input = torch.cat((condition[:, :-self.prediction_size], prediction), dim=1)
-        print(d_input.shape)
+        # print(d_input.shape)
         d_input = (d_input - self.mean) / self.std
         # print(d_input.size())
         d_input = d_input.view(-1, self.condition_size, 3)
