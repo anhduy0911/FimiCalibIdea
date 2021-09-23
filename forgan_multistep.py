@@ -32,6 +32,7 @@ class ForGAN:
         # Making required directories for logging, plots and models' checkpoints
         os.makedirs("./{}/".format(self.opt.dataset), exist_ok=True)
 
+        self.latent_size = opt.generator_latent_size
         # Defining GAN components
         self.generator = Generator(noise_size=opt.noise_size,
                                    condition_size=opt.condition_size,
@@ -86,7 +87,7 @@ class ForGAN:
                 d_real_loss.backward()
                 d_loss += d_real_loss.detach().cpu().numpy()
                 # train discriminator on fake data
-                noise_batch = torch.tensor(rs.normal(0, 1, (condition.size(0), self.opt.noise_size)),
+                noise_batch = torch.tensor(rs.normal(0, 1, (condition.size(0), self.latent_size, self.opt.noise_size)),
                                            device=self.device, dtype=torch.float32)
                 x_fake = self.generator(noise_batch, condition).detach()
                 d_fake_decision = self.discriminator(x_fake, condition)
@@ -100,7 +101,7 @@ class ForGAN:
             d_loss = d_loss / (2 * self.opt.d_iter)
 
             self.generator.zero_grad()
-            noise_batch = torch.tensor(rs.normal(0, 1, (self.opt.batch_size, self.opt.noise_size)), device=self.device,
+            noise_batch = torch.tensor(rs.normal(0, 1, (self.opt.batch_size, self.latent_size, self.opt.noise_size)), device=self.device,
                                        dtype=torch.float32)
             x_fake = self.generator(noise_batch, condition)
             # print(x_fake)
@@ -123,7 +124,7 @@ class ForGAN:
             g_loss_additional = g_loss_additional.detach().cpu().numpy()
 
             # Validation
-            noise_batch = torch.tensor(rs.normal(0, 1, (x_val.size(0), self.opt.noise_size)), device=self.device,
+            noise_batch = torch.tensor(rs.normal(0, 1, (x_val.size(0), self.latent_size, self.opt.noise_size)), device=self.device,
                                        dtype=torch.float32)
             preds = self.generator(noise_batch, x_val).detach().cpu().numpy()
 
@@ -189,7 +190,7 @@ class ForGAN:
         mapes = []
 
         for _ in range(200):
-            noise_batch = torch.tensor(rs.normal(0, 1, (x_test.size(0), self.opt.noise_size)), device=self.device,
+            noise_batch = torch.tensor(rs.normal(0, 1, (x_test.size(0), self.latent_size, self.opt.noise_size)), device=self.device,
                                        dtype=torch.float32)
             pred = self.generator(noise_batch, x_test).detach().cpu().numpy().flatten()
             preds.append(pred)

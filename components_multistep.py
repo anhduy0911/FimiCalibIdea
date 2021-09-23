@@ -17,20 +17,20 @@ class Generator(nn.Module):
             self.cond_to_latent = nn.LSTM(input_size=self.condition_size,
                                           hidden_size=generator_latent_size,
                                           bidirectional=True)
-            # self.latent_to_pred = nn.LSTM(input_size=generator_latent_size * 2,
-            #                               hidden_size=3,
-            #                               num_layers=1,
-            #                               bidirectional=False)
+            self.latent_to_pred = nn.LSTM(input_size=generator_latent_size * 2 + self.noise_size,
+                                          hidden_size=3,
+                                          num_layers=1,
+                                          bidirectional=False)
         else:
             self.cond_to_latent = nn.GRU(input_size=self.condition_size,
                                          hidden_size=generator_latent_size, 
                                          bidirectional=True)
-            # self.latent_to_pred = nn.GRU(input_size=generator_latent_size,
-            #                              hidden_size=3)
-        self.noise_addup = nn.Linear(in_features=generator_latent_size * 2 + self.noise_size, out_features=self.prediction_size * 3)
+            self.latent_to_pred = nn.GRU(input_size=generator_latent_size,
+                                         hidden_size=3)
+        # self.noise_addup = nn.Linear(in_features=generator_latent_size * 2 + self.noise_size, out_features=self.prediction_size * 3)
         self.model = nn.Sequential(
             nn.ReLU(),
-            nn.Conv1d(in_channels=self.prediction_size, out_channels=self.prediction_size, kernel_size=3, padding=1)
+            nn.Conv1d(in_channels=generator_latent_size, out_channels=self.prediction_size, kernel_size=3, padding=1)
         )
 
     def forward(self, noise, condition):
@@ -42,13 +42,13 @@ class Generator(nn.Module):
         # print(condition.size())
         condition = condition.transpose(0, 1)
         condition_latent, _ = self.cond_to_latent(condition)
-        condition_latent = condition_latent[-1]
-        g_input = torch.cat((condition_latent, noise), dim=1)
-        # print(g_input.shape)
-        n_input = self.noise_addup(g_input)
-        n_input = n_input.view(-1, self.prediction_size ,3)
-        # print(n_input.shape)
-        output = self.model(n_input)
+        # condition_latent = condition_latent[-1]
+        # print(condition_latent.shape)
+        # print(noise.shape)
+        g_input = torch.cat((condition_latent, noise.transpose(0,1)), dim=2)
+        output, _ = self.latent_to_pred(g_input)
+        output = output.transpose(0, 1)
+        output = self.model(output)
         # print(output.shape)
         output = output * self.std + self.mean
 
