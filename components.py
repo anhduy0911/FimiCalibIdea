@@ -51,15 +51,19 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, condition_size, discriminator_latent_size, cell_type, mean=0, std=1):
+    def __init__(self, condition_size, discriminator_latent_size, cell_type, pred_dim = 1, mean=0, std=1):
         super().__init__()
         self.discriminator_latent_size = discriminator_latent_size
         self.condition_size = condition_size + 1
         self.mean = mean
         self.std = std
-
+        
+        self.cond_to_pred = nn.LSTM(input_size=3,
+                                    hidden_size=pred_dim, 
+                                    bidirectional=False, 
+                                    num_layers=1)
         if cell_type == "lstm":
-            self.input_to_latent = nn.LSTM(input_size=3,
+            self.input_to_latent = nn.LSTM(input_size=pred_dim,
                                            hidden_size=discriminator_latent_size, 
                                            bidirectional=True, 
                                            num_layers=1)
@@ -75,10 +79,12 @@ class Discriminator(nn.Module):
         )
 
     def forward(self, prediction, condition):
-        d_input = torch.cat((condition[:, :-1], prediction.view(-1, 1, 3)), dim=1)
+        # print(condition.shape)
+        condition_reshape, _ = self.cond_to_pred(condition)
+        d_input = torch.cat((condition_reshape[:, :-1], torch.unsqueeze(prediction, dim=2)), dim=1)
         d_input = (d_input - self.mean) / self.std
         # print(d_input.size())
-        d_input = d_input.view(-1, self.condition_size, 3)
+        # d_input = d_input.view(-1, self.condition_size, 3)
         d_input = d_input.transpose(0, 1)
         d_latent, _ = self.input_to_latent(d_input)
         d_latent = d_latent[-1]

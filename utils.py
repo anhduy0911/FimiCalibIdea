@@ -52,7 +52,7 @@ def calc_kld(generated_data, ground_truth, bins, range_min, range_max):
     return np.abs(kld)
 
 
-def prepare_dataset(dataset, condition_size=None, pred_size=None, use_raw=False, multistep=False):
+def prepare_dataset(dataset, condition_size=None, pred_size=0, multistep=False):
     if dataset == "lorenz":
         with open("./datasets/lorenz/lorenz_dataset.pickle", "rb") as infile:
             dataset = pickle.load(infile)
@@ -108,13 +108,9 @@ def prepare_dataset(dataset, condition_size=None, pred_size=None, use_raw=False,
         x2 = []
         y = []
         for i in range(condition_size, data_raw.shape[0]):
-            if use_raw:
-                x_i = data_raw[i - condition_size:i + 1, :]
-            else:    
-                x_i = data_calib[i - condition_size:i, :]
-                x_i = np.vstack((x_i, data_raw[i: i+1, :]))
+            x_i = data_raw[i - condition_size:i + 1, :]
             y_i = data_calib[i - pred_size:i + 1, :]
-            
+
             y.append(y_i)
             x.append(x_i)
             x2.append(np.vstack((x_i, data_raw[i - condition_size: i + 1])))
