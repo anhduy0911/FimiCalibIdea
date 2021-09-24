@@ -58,7 +58,11 @@ class Discriminator(nn.Module):
         self.mean = mean
         self.std = std
         
-        self.cond_to_pred = nn.LSTM(input_size=3,
+        self.cond_to_z = nn.LSTM(input_size=3,
+                                    hidden_size=pred_dim, 
+                                    bidirectional=False, 
+                                    num_layers=1)
+        self.pred_to_z = nn.LSTM(input_size=pred_dim,
                                     hidden_size=pred_dim, 
                                     bidirectional=False, 
                                     num_layers=1)
@@ -80,9 +84,12 @@ class Discriminator(nn.Module):
 
     def forward(self, prediction, condition):
         # print(condition.shape)
-        condition_reshape, _ = self.cond_to_pred(condition)
-        d_input = torch.cat((condition_reshape[:, :-1], torch.unsqueeze(prediction, dim=2)), dim=1)
-        d_input = (d_input - self.mean) / self.std
+        condition = (condition - self.mean) / self.std
+        prediction = (prediction - self.mean) / self.std
+        condition_reshape, _ = self.cond_to_z(condition)
+        prediction_reshape, _ = self.pred_to_z(torch.unsqueeze(prediction, dim=2))
+        d_input = torch.cat((condition_reshape[:, :-1], prediction_reshape), dim=1)
+        # d_input = (d_input - self.mean) / self.std
         # print(d_input.size())
         # d_input = d_input.view(-1, self.condition_size, 3)
         d_input = d_input.transpose(0, 1)

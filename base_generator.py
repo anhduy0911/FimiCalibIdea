@@ -40,7 +40,7 @@ class Generator(nn.Module):
             nn.Linear(in_features=generator_latent_size * 2,
                       out_features=generator_latent_size),
             nn.ReLU(),
-            nn.Linear(in_features=generator_latent_size, out_features=3)
+            nn.Linear(in_features=generator_latent_size, out_features=1)
         )
 
     def forward(self, condition):
@@ -108,7 +108,7 @@ class ForGAN:
             for idx, (condition, y_truth) in enumerate(dtloader):
                 self.generator.zero_grad()
                 x_fake = self.generator(condition)
-                g_loss_i = adversarial_loss(x_fake.view(-1, 3), y_truth)
+                g_loss_i = adversarial_loss(x_fake.view(-1, 1), y_truth)
                 g_loss_i.backward()
                 optimizer_g.step()
                 if idx == 0:
@@ -229,11 +229,9 @@ if __name__ == '__main__':
                     help="metric to save best model - mae or rmse or kld")
     ap.add_argument("-es", metavar='', dest="early_stop", type=int, default=1000,
                     help="early stopping patience")
-    ap.add_argument("-raw", metavar='', dest="use_raw", type=bool, default=False,
-                    help="whether to use raw only for input of generator")
     opt = ap.parse_args()
 
-    x_train, x_train2, y_train, x_val, x_val2, y_val, x_test, x_test2, y_test = utils.prepare_dataset(opt.dataset, opt.condition_size, opt.use_raw)
+    x_train, x_train2, y_train, x_val, x_val2, y_val, x_test, x_test2, y_test = utils.prepare_dataset(opt.dataset, opt.condition_size)
     opt.data_mean = x_train.mean()
     opt.data_std = x_train.std()
     forgan = ForGAN(opt)
