@@ -112,9 +112,9 @@ class ForGAN:
                 g_loss = -1 * adversarial_loss(d_g_decision, torch.full_like(d_g_decision, 0, device=self.device))
             
             d_decision_real = d_decision_real.detach()
-            g_loss_additional = adversarial_loss(d_g_decision, d_decision_real)
-            g_loss_tot = g_loss_additional * (step / self.opt.n_steps) + g_loss * (1 - step / self.opt.n_steps)
-            g_loss.backward()
+            g_loss_additional = generator_loss(x_fake, real_data)
+            g_loss_tot = g_loss_additional * 0.3 + g_loss * 0.7
+            g_loss_tot.backward()
             optimizer_g.step()
 
             g_loss = g_loss.detach().cpu().numpy()
