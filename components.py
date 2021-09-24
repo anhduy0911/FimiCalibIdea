@@ -11,13 +11,13 @@ class Generator(nn.Module):
         self.mean = mean
         self.std = std
 
-        self.conv_1d = nn.Conv1d(in_channels=3, out_channels=generator_latent_size, kernel_size=3)
+        self.conv_1d = nn.Conv1d(in_channels=3, out_channels=generator_latent_size, kernel_size=3, padding=1)
         if cell_type == "lstm":
-            self.cond_to_latent = nn.LSTM(input_size=6,
+            self.cond_to_latent = nn.LSTM(input_size=self.condition_size,
                                           hidden_size=generator_latent_size,
                                           bidirectional=True)
         else:
-            self.cond_to_latent = nn.GRU(input_size=6,
+            self.cond_to_latent = nn.GRU(input_size=self.condition_size,
                                          hidden_size=generator_latent_size, 
                                          bidirectional=True)
 
@@ -25,7 +25,7 @@ class Generator(nn.Module):
             nn.Linear(in_features=generator_latent_size*2 + self.noise_size,
                       out_features=generator_latent_size + self.noise_size),
             nn.ReLU(),
-            nn.Linear(in_features=generator_latent_size + self.noise_size, out_features=3)
+            nn.Linear(in_features=generator_latent_size + self.noise_size, out_features=1)
 
         )
 
@@ -62,7 +62,7 @@ class Discriminator(nn.Module):
             self.input_to_latent = nn.LSTM(input_size=3,
                                            hidden_size=discriminator_latent_size, 
                                            bidirectional=True, 
-                                           num_layers=3)
+                                           num_layers=1)
         else:
             self.input_to_latent = nn.GRU(input_size=1,
                                           hidden_size=discriminator_latent_size)
