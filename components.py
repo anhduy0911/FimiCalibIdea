@@ -20,7 +20,7 @@ class Generator(nn.Module):
             self.cond_to_latent = nn.GRU(input_size=self.condition_size,
                                          hidden_size=generator_latent_size, 
                                          bidirectional=True)
-
+        self.conv_dense = nn.Conv1d(in_channels=self.condition_size, out_channels=1, kernel_size=3,padding=1)
         self.model = nn.Sequential(
             nn.Linear(in_features=generator_latent_size*2 + self.noise_size,
                       out_features=generator_latent_size + self.noise_size),
@@ -38,8 +38,9 @@ class Generator(nn.Module):
         # print(condition.size())
         condition = condition.transpose(0, 1)
         condition_latent, _ = self.cond_to_latent(condition)
-        condition_latent = condition_latent[-1]
-        g_input = torch.cat((condition_latent, noise), dim=1)
+        # condition_latent = condition_latent[-1]
+        condition_dense = self.conv_dense(condition_latent.transpose(0,1))
+        g_input = torch.cat((torch.squeeze(condition_dense), noise), dim=1)
         # print(g_input.shape)
         output = self.model(g_input)
         output = output * self.std + self.mean
