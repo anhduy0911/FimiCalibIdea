@@ -20,7 +20,7 @@ class Generator(nn.Module):
             self.cond_to_latent = nn.GRU(input_size=self.condition_size,
                                          hidden_size=generator_latent_size, 
                                          bidirectional=True)
-        self.conv_dense = nn.Conv1d(in_channels=self.condition_size, out_channels=1, kernel_size=3,padding=1)
+        self.conv_dense = nn.Conv1d(in_channels=generator_latent_size, out_channels=1, kernel_size=3,padding=1)
         self.model = nn.Sequential(
             nn.Linear(in_features=generator_latent_size*2 + self.noise_size,
                       out_features=generator_latent_size + self.noise_size),
@@ -50,7 +50,6 @@ class Generator(nn.Module):
     def get_noise_size(self):
         return self.noise_size
 
-
 class Discriminator(nn.Module):
     def __init__(self, condition_size, discriminator_latent_size, cell_type, pred_dim = 1, mean=0, std=1):
         super().__init__()
@@ -79,8 +78,7 @@ class Discriminator(nn.Module):
         self.model = nn.Sequential(
             nn.Linear(in_features=discriminator_latent_size*2, out_features=discriminator_latent_size),
             nn.ReLU(),
-            nn.Linear(in_features=discriminator_latent_size, out_features=1),
-            nn.Sigmoid()
+            nn.Linear(in_features=discriminator_latent_size, out_features=1)
         )
 
     def forward(self, prediction, condition):

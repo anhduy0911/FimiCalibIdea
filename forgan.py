@@ -79,21 +79,23 @@ class ForGAN:
                 real_data = y_train[idx]
                 self.discriminator.zero_grad()
                 d_real_decision = self.discriminator(real_data, condition)
-                d_real_loss = adversarial_loss(d_real_decision,
-                                               torch.full_like(d_real_decision, 1, device=self.device))
-                d_real_loss.backward()
-                d_loss += d_real_loss.detach().cpu().numpy()
+                # d_real_loss = adversarial_loss(d_real_decision,
+                #                                torch.full_like(d_real_decision, 1, device=self.device))
+                # d_real_loss.backward()
+                # d_loss += d_real_loss.detach().cpu().numpy()
                 # train discriminator on fake data
                 noise_batch = torch.tensor(rs.normal(0, 1, (condition.size(0), self.opt.noise_size)),
                                            device=self.device, dtype=torch.float32)
                 x_fake = self.generator(noise_batch, condition).detach()
                 d_fake_decision = self.discriminator(x_fake, condition)
-                d_fake_loss = adversarial_loss(d_fake_decision,
-                                               torch.full_like(d_fake_decision, 0, device=self.device))
-                d_fake_loss.backward()
-
+                # d_fake_loss = adversarial_loss(d_fake_decision,
+                #                                torch.full_like(d_fake_decision, 0, device=self.device))
+                # d_fake_loss.backward()
+                d_loss_i = -1 * generator_loss(d_real_decision, d_fake_decision)
+                d_loss_i.backward()
                 optimizer_d.step()
-                d_loss += d_fake_loss.detach().cpu().numpy()
+                d_loss += d_loss_i.detach().cpu().numpy()
+                # d_loss += d_fake_loss.detach().cpu().numpy()
 
             d_loss = d_loss / (2 * self.opt.d_iter)
 
@@ -106,15 +108,16 @@ class ForGAN:
             d_decision_real = self.discriminator(real_data, condition)
             # Mackey-Glass works best with Minmax loss in our expriements while other dataset
             # produce their best result with non-saturated loss
-            if opt.dataset == "mg" or opt.dataset == 'aqm':
-                g_loss = adversarial_loss(d_g_decision, torch.full_like(d_g_decision, 1, device=self.device))
-            else:
-                g_loss = -1 * adversarial_loss(d_g_decision, torch.full_like(d_g_decision, 0, device=self.device))
+            # if opt.dataset == "mg" or opt.dataset == 'aqm':
+            #     g_loss = adversarial_loss(d_g_decision, torch.full_like(d_g_decision, 1, device=self.device))
+            # else:
+            #     g_loss = -1 * adversarial_loss(d_g_decision, torch.full_like(d_g_decision, 0, device=self.device))
             
             d_decision_real = d_decision_real.detach()
-            g_loss_additional = generator_loss(x_fake, real_data)
+            g_loss_additional = generator_loss(d_g_decision, d_decision_real)
+            g_loss = generator_loss(x_fake, real_data)
             g_loss_tot = g_loss_additional * 0.3 + g_loss * 0.7
-            g_loss_tot.backward()
+            g_loss_additional.backward()
             optimizer_g.step()
 
             g_loss = g_loss.detach().cpu().numpy()
