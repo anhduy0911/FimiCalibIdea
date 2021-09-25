@@ -58,16 +58,16 @@ class Discriminator(nn.Module):
         self.mean = mean
         self.std = std
         
-        self.cond_to_z = nn.LSTM(input_size=3,
+        self.cond_to_z = nn.LSTM(input_size=2,
                                     hidden_size=pred_dim, 
                                     bidirectional=False, 
                                     num_layers=1)
-        self.pred_to_z = nn.LSTM(input_size=pred_dim,
-                                    hidden_size=pred_dim, 
-                                    bidirectional=False, 
-                                    num_layers=1)
+        # self.pred_to_z = nn.LSTM(input_size=pred_dim,
+        #                             hidden_size=pred_dim, 
+        #                             bidirectional=False, 
+        #                             num_layers=1)
         if cell_type == "lstm":
-            self.input_to_latent = nn.LSTM(input_size=pred_dim,
+            self.input_to_latent = nn.LSTM(input_size=pred_dim * 2,
                                            hidden_size=discriminator_latent_size, 
                                            bidirectional=True, 
                                            num_layers=1)
@@ -84,12 +84,16 @@ class Discriminator(nn.Module):
 
     def forward(self, prediction, condition):
         # print(condition.shape)
-        condition = (condition - self.mean) / self.std
-        prediction = (prediction - self.mean) / self.std
-        condition_reshape, _ = self.cond_to_z(condition)
-        prediction_reshape, _ = self.pred_to_z(torch.unsqueeze(prediction, dim=2))
-        d_input = torch.cat((condition_reshape[:, :-1], prediction_reshape), dim=1)
-        # d_input = (d_input - self.mean) / self.std
+        condition_other = (condition[:,:,1:] - self.mean) / self.std
+        # prediction = (prediction - self.mean) / self.std
+        condition_reshape, _ = self.cond_to_z(condition_other)
+        # print(condition_reshape.size())
+        # prediction_reshape, _ = self.pred_to_z(torch.unsqueeze(prediction, dim=2))
+        d_input = torch.cat((condition[:,:-1,0], prediction), dim=1)
+        # print(d_input.size())
+        d_input = (d_input - self.mean) / self.std
+        # print(d_input.size())
+        d_input = torch.cat((torch.unsqueeze(d_input, 2), condition_reshape), dim=2)
         # print(d_input.size())
         # d_input = d_input.view(-1, self.condition_size, 3)
         d_input = d_input.transpose(0, 1)
