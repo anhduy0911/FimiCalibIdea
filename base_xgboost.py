@@ -56,10 +56,10 @@ def scaling_window(training_data, testing_data, seq_length_in,seq_length_out,opt
     return x, y, z
 
 def get_data(data,seq_length_in,seq_length_out,option=0):
-  tmp_arr = np.vstack((data[0, :], data[3, :])).T
+  tmp_arr = np.vstack((data[0, :], data[4, :])).T
 #   print(tmp_arr.shape)
   sc = MinMaxScaler()
-  tmp_arr = sc.fit_transform(tmp_arr)
+  # tmp_arr = sc.fit_transform(tmp_arr)
 #   print(tmp_arr[:10])
   data_x = tmp_arr[:, 0].reshape(-1, 1)
   data_y = tmp_arr[:, 1].reshape(-1, 1)
@@ -111,12 +111,12 @@ def xgb_exp(data,seq_length_in,seq_length_out,option):
 #   print(data_predict.shape)
   tmp_arr = np.hstack((data_predict, real_data))
 #   print(tmp_arr.shape)
-  tmp_arr = sc.inverse_transform(tmp_arr)
+  # tmp_arr = sc.inverse_transform(tmp_arr)
   data_predict = tmp_arr[:, 0].reshape(-1,1)
   real_data = tmp_arr[:, 1].reshape(-1,1)
 #   print(data_predict.shape)
   tmp_arr = np.hstack((original_data, real_data))
-  tmp_arr = sc.inverse_transform(tmp_arr)
+  # tmp_arr = sc.inverse_transform(tmp_arr)
   original_data = tmp_arr[:, 0].reshape(-1,1)
 
   list_feature = ["PM2_5"]
@@ -164,5 +164,6 @@ def xgb_exp(data,seq_length_in,seq_length_out,option):
     fig.savefig('img/xgboost.png')
 
 if __name__ == '__main__':
-    aqm = pd.read_csv('Data/grim_fimi.csv', header=0).values.T
+    aqm = pd.read_csv('Data/fimi/envitus_fimi1.csv', header=0).values[:,1:].T
+    print(aqm)
     xgb_exp(aqm,32,1,0)

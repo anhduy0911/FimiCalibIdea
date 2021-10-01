@@ -176,6 +176,8 @@ class ForGAN:
     def test(self, x_test, y_test, load_best=True):
         import os
         import matplotlib.pyplot as plt
+        before_calib = x_test[:, 0]
+
         x_test = torch.tensor(x_test, device=self.device, dtype=torch.float32)
         if os.path.isfile("./{}/best.torch".format(self.opt.dataset)) and load_best:
             checkpoint = torch.load("./{}/best.torch".format(self.opt.dataset), map_location=self.device)
@@ -203,9 +205,6 @@ class ForGAN:
         preds_mean = np.mean(preds, axis=0)
         preds = preds.flatten()
         print(preds_mean.shape) 
-        before_calib = pd.read_csv('Data/aqmes1_part.csv', header=0)['PM2_5'].values
-        before_calib = before_calib[int(before_calib.shape[0] * 0.6):]
-        print(before_calib.shape)
 
         fig, (ax1, ax2) = plt.subplots(1, 2)
         fig.set_figheight(8)
@@ -269,9 +268,11 @@ if __name__ == '__main__':
                     help="metric to save best model - mae or rmse or kld")
     ap.add_argument("-es", metavar='', dest="early_stop", type=int, default=1000,
                     help="early stopping patience")
+    ap.add_argument("-ssa", metavar='', dest="ssa", type=bool, default=False,
+                    help="use ssa preprocessing")
     opt = ap.parse_args()
 
-    x_train, x_train2, y_train, x_val, x_val2, y_val, x_test, x_test2, y_test = utils.prepare_dataset(opt.dataset, opt.condition_size)
+    x_train, x_train2, y_train, x_val, x_val2, y_val, x_test, x_test2, y_test = utils.prepare_dataset(opt.condition_size, ssa=opt.ssa)
     opt.data_mean = x_train.mean()
     opt.data_std = x_train.std()
     forgan = ForGAN(opt)
