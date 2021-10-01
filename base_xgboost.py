@@ -119,7 +119,7 @@ def xgb_exp(data,seq_length_in,seq_length_out,option):
   tmp_arr = sc.inverse_transform(tmp_arr)
   original_data = tmp_arr[:, 0].reshape(-1,1)
 
-  list_feature = ["PM2_5", "temp", "humidity"]
+  list_feature = ["PM2_5"]
   index_feature = get_index_feat(0)
   # print(index_feature)
   if len(data_predict.shape) < 2:
@@ -154,7 +154,7 @@ def xgb_exp(data,seq_length_in,seq_length_out,option):
     rmse2 = np.sqrt(np.square(error).mean())
     mae2 = np.abs(error).mean()
     mape2 = np.abs(error / real_data[-test_size:, i]).mean() * 100
-    print(f'After calib: MAE: {str(mae2)} {mae3}, RMSE: {str(rmse2)}, MAPE: {str(mape2)}')
+    print(f'After calib: MAE: {str(mae2)}, RMSE: {str(rmse2)}, MAPE: {str(mape2)}')
 
     # ax2.axvline(x=train_size, c='g', linestyle='--')
     ax2.plot(real_data[-test_size:, i], label='Real')
@@ -164,5 +164,5 @@ def xgb_exp(data,seq_length_in,seq_length_out,option):
     fig.savefig('img/xgboost.png')
 
 if __name__ == '__main__':
-    aqm = pd.read_csv('Data/fimi/12_13.csv', header=0).values.T
+    aqm = pd.read_csv('Data/grim_fimi.csv', header=0).values.T
     xgb_exp(aqm,32,1,0)

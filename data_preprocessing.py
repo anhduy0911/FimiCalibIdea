@@ -93,9 +93,58 @@ def plot_data_grim():
     plt.gcf().autofmt_xdate()
     plt.show()
 
+def new_dataset():
+    envitus = pd.read_csv("Data/fimi/envitus.csv", header=0)
+    envitus['datetime'] = pd.to_datetime(envitus['datetime'], format='%Y-%m-%d %H:%M:%S') + datetime.timedelta(seconds=25200) # 7 hours
+    envitus['datetime'] = pd.to_datetime(envitus['datetime'], format='%Y-%m-%d %H:%M:%S').dt.round('1min')
+    # envitus.to_csv('Data/fimi/envitus.csv', index=None)
+
+    fimi1 = pd.read_csv("Data/fimi/fimi1.csv", header=0)
+    fimi1.index = pd.DatetimeIndex(fimi1['datetime'])
+
+    mean_fimi1 = pd.DataFrame()
+    mean_fimi1['PM2_5'] = fimi1['PM2_5'].resample('1Min').mean().round(2)
+    mean_fimi1['PM10_0'] = fimi1['PM10_0'].resample('1Min').mean().round(2)
+    mean_fimi1['temp'] = fimi1['temp'].resample('1Min').mean().round(2)
+    mean_fimi1['humidity'] = fimi1['humidity'].resample('1Min').mean().round(2)
+    # mean_fimi1.to_csv('Data/fimi/mean_fimi1.csv', index=True)
+
+    merged = pd.merge(mean_fimi1, envitus, how='outer', on='datetime')
+    clean_dat = pd.DataFrame()
+    clean_dat['datetime'] = merged['datetime']
+    clean_dat['PM2_5'] = merged['PM2_5_x']
+    clean_dat['PM10_0'] = merged['PM10_0_x']
+    clean_dat['temp'] = merged['temp_x']
+    clean_dat['humidity'] = merged['humidity_x']
+    clean_dat['PM2_5_cal'] = merged['PM2_5_y']
+    clean_dat['temp_cal'] = merged['temp_y']
+    clean_dat['humidity_cal'] = merged['humidity_y'] 
+    clean_dat['PM10_0_cal'] = merged['PM10_0_y']
+
+    clean_dat = clean_dat.dropna(axis=0)
+    print(clean_dat.head())
+    clean_dat.to_csv('Data/fimi/envitus_fimi1.csv', index=None)
+
+def plot_data_new():
+    merged = pd.read_csv("Data/fimi/envitus_fimi1.csv", header=0)
+    fig, (ax1, ax2, ax3) = plt.subplots(3,1, sharex=True)
+    ax1.plot(merged['datetime'],merged['PM2_5'], 'b')
+    ax1.plot(merged['datetime'],merged['PM2_5_cal'], 'r')
+    ax1.set(xlabel='Date', ylabel='PM2.5')
+    ax2.plot(merged['datetime'],merged['temp'], 'b')
+    ax2.plot(merged['datetime'],merged['temp_cal'], 'r')
+    ax2.set(xlabel='Date', ylabel='temp')
+    ax3.plot(merged['datetime'],merged['humidity'], 'b')
+    ax3.plot(merged['datetime'],merged['humidity_cal'], 'r')
+    ax3.set(xlabel='Date', ylabel='humidity')
+
+    plt.gcf().autofmt_xdate()
+    plt.show()
 
 if __name__ == '__main__':
-    plot_data()
+    # plot_data()
+    # new_dataset()
+    plot_data_new()
     # plot_data_grim()
     # import numpy as np
     # aqm = pd.read_csv("Data/aqmes1_part.csv", header=0)
