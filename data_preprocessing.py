@@ -99,7 +99,7 @@ def new_dataset():
     envitus['datetime'] = pd.to_datetime(envitus['datetime'], format='%Y-%m-%d %H:%M:%S').dt.round('1min')
     # envitus.to_csv('Data/fimi/envitus.csv', index=None)
 
-    fimi1 = pd.read_csv("Data/fimi/fimi1.csv", header=0)
+    fimi1 = pd.read_csv("Data/fimi/fimi14.csv", header=0)
     fimi1.index = pd.DatetimeIndex(fimi1['datetime'])
 
     mean_fimi1 = pd.DataFrame()
@@ -123,10 +123,10 @@ def new_dataset():
 
     clean_dat = clean_dat.dropna(axis=0)
     print(clean_dat.head())
-    clean_dat.to_csv('Data/fimi/envitus_fimi1.csv', index=None)
+    clean_dat.to_csv('Data/fimi/envitus_fimi14.csv', index=None)
 
 def plot_data_new():
-    merged = pd.read_csv("Data/fimi/envitus_fimi1.csv", header=0)
+    merged = pd.read_csv("Data/fimi/envitus_fimi14.csv", header=0)
     fig, (ax1, ax2, ax3) = plt.subplots(3,1, sharex=True)
     ax1.plot(merged['datetime'],merged['PM2_5'], 'b')
     ax1.plot(merged['datetime'],merged['PM2_5_cal'], 'r')
