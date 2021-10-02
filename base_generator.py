@@ -26,38 +26,41 @@ class Generator(nn.Module):
         self.mean = mean
         self.std = std
 
-        self.conv_1d = nn.Conv1d(in_channels=3, out_channels=generator_latent_size, kernel_size=3)
+        self.conv_1d = nn.Conv1d(in_channels=1, out_channels=generator_latent_size, kernel_size=3, padding=1)
         if cell_type == "lstm":
-            self.cond_to_latent = nn.LSTM(input_size=6,
+            self.cond_to_latent = nn.LSTM(input_size=self.condition_size,
                                           hidden_size=generator_latent_size,
-                                          num_layers=1,
                                           bidirectional=True)
         else:
-            self.cond_to_latent = nn.GRU(input_size=3,
-                                         hidden_size=generator_latent_size)
-
+            self.cond_to_latent = nn.GRU(input_size=self.condition_size,
+                                         hidden_size=generator_latent_size, 
+                                         bidirectional=True)
+        self.conv_dense = nn.Conv1d(in_channels=generator_latent_size, out_channels=1, kernel_size=3,padding=1)
         self.model = nn.Sequential(
-            nn.Linear(in_features=generator_latent_size * 2,
+            nn.Linear(in_features=generator_latent_size*2,
                       out_features=generator_latent_size),
             nn.ReLU(),
             nn.Linear(in_features=generator_latent_size, out_features=1)
+
         )
 
     def forward(self, condition):
         condition = (condition - self.mean) / self.std
-        # condition = condition.view(-1, self.condition_size, 2)
+        # condition = condition.view(-1, self.condition_size, 1)
         condition = condition.transpose(1, 2)
         # print(condition.size())
         condition = self.conv_1d(condition)
         # print(condition.size())
         condition = condition.transpose(0, 1)
         condition_latent, _ = self.cond_to_latent(condition)
-        condition_latent = condition_latent[-1]
-        g_input = condition_latent
-        output = self.model(g_input)
+        # condition_latent = condition_latent[-1]
+        condition_dense = self.conv_dense(condition_latent.transpose(0,1))
+        # print(g_input.shape)
+        output = self.model(condition_dense)
         output = output * self.std + self.mean
 
         return output
+
 
 
 class ForGAN:
