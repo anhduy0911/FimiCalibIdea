@@ -1,6 +1,7 @@
 import datetime
 import matplotlib.pyplot as plt
 import pandas as pd
+import seaborn as sns
 
 def plot_data():
     aqm1 = pd.read_csv("Data/aqmesh1.csv", header=0)[26:1458]
@@ -141,10 +142,21 @@ def plot_data_new():
     plt.gcf().autofmt_xdate()
     plt.show()
 
+def plot_correlation():
+    merged = pd.read_csv("Data/fimi/envitus_fimi14.csv", header=0)
+    
+    corr = merged.corr()
+    ans = sns.heatmap(corr, xticklabels=corr.columns, yticklabels=corr.columns, annot=True)
+
+    #save image 
+    figure = ans.get_figure()    
+    figure.savefig('img/correlations.png', dpi=800)
+    
 if __name__ == '__main__':
     # plot_data()
     # new_dataset()
-    plot_data_new()
+    # plot_data_new()
+    plot_correlation()
     # plot_data_grim()
     # import numpy as np
     # aqm = pd.read_csv("Data/aqmes1_part.csv", header=0)
