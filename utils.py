@@ -178,7 +178,7 @@ class SSA(object):
     def get_lst_sigma(self):
         return self.Sigma
 
-def get_input_data(input_file, default_n, sigma_lst):
+def get_input_data(input_file, default_n):
     dat = pd.read_csv(input_file, header=0)
 
     pm = dat['PM2_5'].to_list()
@@ -189,37 +189,8 @@ def get_input_data(input_file, default_n, sigma_lst):
     lst_temp_ssa = SSA(temp, default_n)
     lst_temp_humid = SSA(hud, default_n)
 
-    pm_ssa = lst_pm_ssa.reconstruct(sigma_lst)
-    t_ssa = lst_temp_ssa.reconstruct(sigma_lst)
-    h_ssa = lst_temp_humid.reconstruct(sigma_lst)
-
-    dat['PM2_5_ssa'] = pm_ssa
-    # print(dat['Q'][:5])
-    dat['temp_ssa'] = t_ssa
-    dat['humidity_ssa'] = h_ssa
-    # print(dat['H'][:5])
-
-    # print(dat.head())
-    # result = dat[['Q', 'H', 'Q_ssa', 'H_ssa']]
-
-    fig = plt.figure(figsize=(10, 6))
-    fig.add_subplot(131)
-    plt.plot(pm[:200], label='pm_raw')
-    plt.plot(pm_ssa[:200], label='pm_ssa')
-    plt.legend()
-
-    fig.add_subplot(132)
-    plt.plot(temp[:200], label='t_raw')
-    plt.plot(t_ssa[:200], label='t_ssa')
-    plt.legend()
-
-    fig.add_subplot(133)
-    plt.plot(hud[:200], label='h_raw')
-    plt.plot(h_ssa[:200], label='h_ssa')
-    plt.legend()
-
-    plt.savefig('img/ssa_processed.png')
-    return dat
+    # print(lst_pm_ssa.TS_comps.shape)
+    return lst_pm_ssa.TS_comps, lst_temp_ssa.TS_comps, lst_temp_humid.TS_comps
 
 def calc_kld(generated_data, ground_truth, bins, range_min, range_max):
     if range_min and range_max: 
@@ -241,20 +212,14 @@ def calc_kld(generated_data, ground_truth, bins, range_min, range_max):
 
 
 def prepare_dataset(condition_size=None, pred_size=0, multistep=False, ssa=False):
+        raw_dataset = pd.read_csv('Data/fimi/envitus_fimi14.csv', header=0)
+        raw_cols = ['PM2_5']
+        calib_cols = ['PM2_5_cal']
+        data_raw = raw_dataset[raw_cols].values
+        data_calib = raw_dataset[calib_cols].values
+        # print(data_raw.shape)
         if ssa:
-            raw_dataset = get_input_data('Data/fimi/envitus_fimi1.csv', 20, [0,1,2,3,4])
-            raw_cols = ['PM2_5_ssa', 'temp_ssa', 'humidity_ssa']
-            calib_cols = ['PM2_5_cal']
-            data_raw = raw_dataset[raw_cols].values
-            data_calib = raw_dataset[calib_cols].values
-            print(data_raw.shape)
-        else:
-            raw_dataset = pd.read_csv('Data/fimi/envitus_fimi1.csv', header=0)
-            raw_cols = ['PM2_5', 'temp', 'humidity']
-            calib_cols = ['PM2_5_cal']
-            data_raw = raw_dataset[raw_cols].values
-            data_calib = raw_dataset[calib_cols].values
-            print(data_raw.shape)
+            data_raw, _, _ = get_input_data('Data/fimi/envitus_fimi14.csv', 10)
 
         x = []
         x2 = []
@@ -265,31 +230,25 @@ def prepare_dataset(condition_size=None, pred_size=0, multistep=False, ssa=False
 
             y.append(y_i)
             x.append(x_i)
-            x2.append(np.vstack((x_i, data_raw[i - condition_size: i + 1])))
 
         x = np.array(x)
-        x2 = np.array(x2)
         y = np.array(y)
         if not multistep: 
             y = data_calib[condition_size:]
 
         x_train = x[:int(x.shape[0] * 0.5)]
-        x_train2 = x2[:int(x.shape[0] * 0.5)]
         y_train = y[:int(x.shape[0] * 0.5)]
         x_val = x[int(x.shape[0] * 0.5):int(x.shape[0] * 0.6)]
-        x_val2 = x2[int(x.shape[0] * 0.5):int(x.shape[0] * 0.6)]
         y_val = y[int(x.shape[0] * 0.5):int(x.shape[0] * 0.6)]
         x_test = x[int(x.shape[0] * 0.6):]
-        x_test2 = x2[int(x.shape[0] * 0.6):]
         y_test = y[int(x.shape[0] * 0.6):]
     
-        return x_train, x_train2, y_train, x_val, x_val2, y_val, x_test, x_test2, y_test
+        return x_train, y_train, x_val, y_val, x_test, y_test
 
 if __name__ == '__main__':
-    x_train, x_train2, y_train, x_val, x_val2, y_val, x_test, x_test2, y_test = prepare_dataset('aqm', condition_size=6)
+    x_train, y_train, x_val, y_val, x_test, y_test = prepare_dataset(condition_size=6, ssa=True)
     print(x_train.shape)
-    print(x_train2.shape)
     print(y_val.shape)
 
-    data_file = "Data/fimi/envitus_fimi1.csv"
-    get_input_data(data_file, 20, [0,1,2])
+    data_file = "Data/fimi/envitus_fimi14.csv"
+    get_input_data(data_file, 20)
