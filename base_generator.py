@@ -9,6 +9,7 @@ import utils
 from torch import nn
 from tqdm import tqdm
 import pandas as pd
+from retain_generator import Generator as RGenerator
 
 # Fixing random seeds
 torch.manual_seed(1368)
@@ -26,16 +27,16 @@ class Generator(nn.Module):
         self.mean = mean
         self.std = std
 
-        self.conv_1d = nn.Conv1d(in_channels=1, out_channels=generator_latent_size, kernel_size=3, padding=1)
+
         if cell_type == "lstm":
-            self.cond_to_latent = nn.LSTM(input_size=self.condition_size,
+            self.cond_to_latent = nn.LSTM(input_size=10,
                                           hidden_size=generator_latent_size,
                                           bidirectional=True)
         else:
             self.cond_to_latent = nn.GRU(input_size=self.condition_size,
                                          hidden_size=generator_latent_size, 
                                          bidirectional=True)
-        self.conv_dense = nn.Conv1d(in_channels=generator_latent_size, out_channels=1, kernel_size=3,padding=1)
+        self.conv_dense = nn.Conv1d(in_channels=self.condition_size, out_channels=1, kernel_size=3,padding=1)
         self.model = nn.Sequential(
             nn.Linear(in_features=generator_latent_size*2,
                       out_features=generator_latent_size),
@@ -47,9 +48,9 @@ class Generator(nn.Module):
     def forward(self, condition):
         condition = (condition - self.mean) / self.std
         # condition = condition.view(-1, self.condition_size, 1)
-        condition = condition.transpose(1, 2)
+        # condition = condition.transpose(1, 2)
         # print(condition.size())
-        condition = self.conv_1d(condition)
+        # condition = self.conv_1d(condition)
         # print(condition.size())
         condition = condition.transpose(0, 1)
         condition_latent, _ = self.cond_to_latent(condition)
@@ -60,8 +61,6 @@ class Generator(nn.Module):
         output = output * self.std + self.mean
 
         return output
-
-
 
 class ForGAN:
     def __init__(self, opt):
@@ -79,7 +78,7 @@ class ForGAN:
         os.makedirs("./{}/".format(self.opt.dataset), exist_ok=True)
 
         # Defining GAN components
-        self.generator = Generator(condition_size=opt.condition_size,
+        self.generator = RGenerator(condition_size=opt.condition_size,
                                    generator_latent_size=opt.generator_latent_size,
                                    cell_type=opt.cell_type,
                                    mean=opt.data_mean,
@@ -234,7 +233,7 @@ if __name__ == '__main__':
                     help="use ssa preprocessing")
     opt = ap.parse_args()
 
-    x_train, x_train2, y_train, x_val, x_val2, y_val, x_test, x_test2, y_test = utils.prepare_dataset(opt.condition_size, ssa=opt.ssa)
+    x_train, y_train, x_val, y_val, x_test, y_test = utils.prepare_dataset(opt.condition_size, ssa=opt.ssa)
     opt.data_mean = x_train.mean()
     opt.data_std = x_train.std()
     forgan = ForGAN(opt)

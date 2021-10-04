@@ -70,8 +70,6 @@ def plot_data_grim():
     clean_dat['temp'] = merged['temp']
     clean_dat['humidity'] = merged['humidity']
     clean_dat['PM2_5_cal'] = merged['PM2_5_x']
-    # clean_dat['temp_cal'] = merged['temp_x']
-    # clean_dat['humidity_cal'] = merged['humidity_x']    
 
     clean_dat = clean_dat.dropna(axis=0)
     clean_dat.to_csv('Data/grim_fimi.csv', index=None)
@@ -81,15 +79,6 @@ def plot_data_grim():
     fig, (ax1) = plt.subplots(1,1, sharex=True)
     ax1.plot(clean_dat['datetime'],clean_dat['PM2_5'], 'g-')
     ax1.plot(clean_dat['datetime'],clean_dat['PM2_5_cal'], 'r-')
-    # ax1.set(xlabel='Date', ylabel='PM2.5')
-    # ax2.plot(range(len(aqm2['PM2_5'])),aqm2['temp'], 'b-')
-    # ax2.plot(range(len(aqm3['PM2_5'])),aqm3['temp'], 'g-')
-    # ax2.plot(range(len(fimi2['PM2_5'])),fimi2['temp'], 'r-')
-    # ax2.set(xlabel='Date', ylabel='temp')
-    # ax3.plot(range(len(aqm2['PM2_5'])),aqm2['humidity'], 'b-')
-    # ax3.plot(range(len(aqm3['PM2_5'])),aqm3['humidity'], 'g-')
-    # ax3.plot(range(len(fimi2['PM2_5'])),fimi2['humidity'], 'r-')
-    # ax3.set(xlabel='Date', ylabel='humidity')
     
     plt.gcf().autofmt_xdate()
     plt.show()
@@ -151,7 +140,7 @@ def plot_correlation():
     #save image 
     figure = ans.get_figure()    
     figure.savefig('img/correlations.png', dpi=800)
-    
+
 if __name__ == '__main__':
     # plot_data()
     # new_dataset()
