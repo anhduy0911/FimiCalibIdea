@@ -5,7 +5,7 @@ import numpy as np
 from numpy.lib.type_check import real
 import torch
 import utils
-from components import Generator, Discriminator
+from components import RGenerator, Generator, Discriminator
 from torch import nn
 from tqdm import tqdm
 import pandas as pd
@@ -33,7 +33,7 @@ class ForGAN:
         os.makedirs("./{}/".format(self.opt.dataset), exist_ok=True)
 
         # Defining GAN components
-        self.generator = Generator(noise_size=opt.noise_size,
+        self.generator = RGenerator(noise_size=opt.noise_size,
                                    condition_size=opt.condition_size,
                                    generator_latent_size=opt.generator_latent_size,
                                    cell_type=opt.cell_type,
@@ -176,7 +176,7 @@ class ForGAN:
     def test(self, x_test, y_test, load_best=True):
         import os
         import matplotlib.pyplot as plt
-        before_calib = x_test[:, 0]
+        before_calib = x_test[:, 0, 0]
 
         x_test = torch.tensor(x_test, device=self.device, dtype=torch.float32)
         if os.path.isfile("./{}/best.torch".format(self.opt.dataset)) and load_best:
@@ -272,7 +272,7 @@ if __name__ == '__main__':
                     help="use ssa preprocessing")
     opt = ap.parse_args()
 
-    x_train, x_train2, y_train, x_val, x_val2, y_val, x_test, x_test2, y_test = utils.prepare_dataset(opt.condition_size, ssa=opt.ssa)
+    x_train, y_train, x_val, y_val, x_test, y_test = utils.prepare_dataset(opt.condition_size, ssa=opt.ssa)
     opt.data_mean = x_train.mean()
     opt.data_std = x_train.std()
     forgan = ForGAN(opt)

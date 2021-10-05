@@ -15,13 +15,9 @@ class Generator(nn.Module):
         self.std = std
 
         if cell_type == "lstm":
-            self.variable_att = nn.Sequential(
-                nn.LSTM(input_size=10, hidden_size=generator_latent_size)
-            ) 
-            self.step_att = nn.Sequential(
-                nn.LSTM(input_size=10, hidden_size=1)
-            ) 
-            self.cond_to_latent = nn.LSTM(input_size=10,
+            self.variable_att = nn.LSTM(input_size=10, hidden_size=10)
+            # self.step_att = nn.LSTM(input_size=10, hidden_size=1)
+            self.cond_to_latent = nn.LSTM(input_size=1,
                                           hidden_size=generator_latent_size,
                                           bidirectional=False)
         else:
@@ -43,26 +39,32 @@ class Generator(nn.Module):
         # condition = condition.transpose(1, 2)
         # print(condition.size())
         # condition = self.conv_1d(condition)
-        # print(condition.size())
         condition = condition.transpose(0, 1)
-        condition_latent, _ = self.cond_to_latent(condition)
+        # print(condition.size())
         # print(condition_latent.shape)
         variable_attention_weight, _ = self.variable_att(condition)
-        variable_attention_weight = nn.Tanh()(variable_attention_weight)
+        variable_attention_weight = nn.Softmax(dim=2)(variable_attention_weight)
         # print(variable_attention_weight.shape)
-        step_attention_weight, _ = self.step_att(condition)
-        step_attention_weight = nn.Softmax(dim=1)(torch.squeeze(step_attention_weight))
-        step_attention_weight = step_attention_weight.transpose(0,1)
+        # step_attention_weight, _ = self.step_att(condition)
+        # step_attention_weight = nn.Softmax(dim=1)(torch.squeeze(step_attention_weight))
+        # step_attention_weight = step_attention_weight.transpose(0,1)
         # print(step_attention_weight.shape)
-        w_condition_latent  = condition_latent * variable_attention_weight
-        w_condition_latent = w_condition_latent.transpose(0,1)
+        w_condition_latent  = condition * variable_attention_weight
+        # w_condition_latent  = condition * step_attention_weight
+        # w_condition_latent = condition * torch.unsqueeze(step_attention_weight, dim=2)
         # print(w_condition_latent.shape)
-        w_condition_latent = w_condition_latent * torch.unsqueeze(step_attention_weight, dim=2)
-        # print(w_condition_latent.shape)
+        # w_condition_latent = w_condition_latent.transpose(0,1)
+        condition_sum = torch.sum(w_condition_latent, dim=2)
+        condition_latent, _ = self.cond_to_latent(torch.unsqueeze(condition_sum, dim=2))
         # condition_latent = condition_latent[-1]
-        condition_dense = self.conv_dense(w_condition_latent)
+        # print(condition_latent.shape)
+        # condition_sum = condition_sum.transpose(0,1)
+        # print(condition_sum.shape)
+        # condition_latent, _ = self.cond_to_latent(condition_sum)
+        # condition_latent = torch.squeeze(condition_latent.transpose(0, 1))
+        condition_dense = self.conv_dense(condition_latent.transpose(0,1))
         # print(condition_dense.shape)
-        output = self.model(condition_dense)
+        output = self.model(torch.squeeze(condition_dense))
         output = output * self.std + self.mean
 
         return output

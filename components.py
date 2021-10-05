@@ -1,6 +1,57 @@
 import torch
 import torch.nn as nn
 
+class RGenerator(nn.Module):
+    def __init__(self, noise_size, condition_size, generator_latent_size, cell_type, mean=0, std=1):
+        super().__init__()
+        self.noise_size = noise_size
+        self.condition_size = condition_size + 1
+        self.generator_latent_size = generator_latent_size
+        self.mean = mean
+        self.std = std
+
+        if cell_type == "lstm":
+            self.variable_att = nn.LSTM(input_size=10, hidden_size=10)
+            # self.step_att = nn.LSTM(input_size=10, hidden_size=1)
+            self.cond_to_latent = nn.LSTM(input_size=1,
+                                          hidden_size=generator_latent_size,
+                                          bidirectional=False)
+        else:
+            self.cond_to_latent = nn.GRU(input_size=self.condition_size,
+                                         hidden_size=generator_latent_size, 
+                                         bidirectional=True)
+        self.conv_dense = nn.Conv1d(in_channels=self.condition_size, out_channels=1, kernel_size=3,padding=1)
+        self.model = nn.Sequential(
+            nn.Linear(in_features=generator_latent_size + self.noise_size,
+                      out_features=generator_latent_size),
+            nn.ReLU(),
+            nn.Linear(in_features=generator_latent_size, out_features=1)
+
+        )
+
+    def forward(self, noise, condition):
+        condition = (condition - self.mean) / self.std
+
+        condition = condition.transpose(0, 1)
+        variable_attention_weight, _ = self.variable_att(condition)
+        variable_attention_weight = nn.Softmax(dim=2)(variable_attention_weight)
+
+        w_condition_latent  = condition * variable_attention_weight
+        condition_sum = torch.sum(w_condition_latent, dim=2)
+        condition_latent, _ = self.cond_to_latent(torch.unsqueeze(condition_sum, dim=2))
+        # condition_latent = condition_latent[-1]
+        # print(condition_latent.shape)
+        # condition_sum = condition_sum.transpose(0,1)
+        # print(condition_sum.shape)
+        # condition_latent, _ = self.cond_to_latent(condition_sum)
+        # condition_latent = torch.squeeze(condition_latent.transpose(0, 1))
+        condition_dense = self.conv_dense(condition_latent.transpose(0,1))
+        g_input = torch.cat((torch.squeeze(condition_dense), noise), dim=1)
+        output = self.model(g_input)
+        output = output * self.std + self.mean
+
+        return output
+
 class Generator(nn.Module):
     def __init__(self, noise_size, condition_size, generator_latent_size, cell_type, mean=0, std=1):
         super().__init__()
@@ -58,7 +109,7 @@ class Discriminator(nn.Module):
         self.mean = mean
         self.std = std
         
-        self.cond_to_z = nn.LSTM(input_size=2,
+        self.cond_to_z = nn.LSTM(input_size=9,
                                     hidden_size=pred_dim, 
                                     bidirectional=False, 
                                     num_layers=1)

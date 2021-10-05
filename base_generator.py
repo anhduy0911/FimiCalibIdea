@@ -155,7 +155,7 @@ class ForGAN:
     def test(self, x_test, y_test, load_best=True):
         import os
         import matplotlib.pyplot as plt
-        before_calib = x_test[:,0]
+        before_calib = x_test[:,0, 0]
         x_test = torch.tensor(x_test, device=self.device, dtype=torch.float32)
         if os.path.isfile("./{}/best.torch".format(self.opt.dataset)) and load_best:
             checkpoint = torch.load("./{}/best_gen.torch".format(self.opt.dataset), map_location=self.device)
