@@ -145,7 +145,7 @@ if __name__ == '__main__':
     # plot_data()
     # new_dataset()
     # plot_data_new()
-    plot_correlation()
+    # plot_correlation()
     # plot_data_grim()
     # import numpy as np
     # aqm = pd.read_csv("Data/aqmes1_part.csv", header=0)

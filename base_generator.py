@@ -9,7 +9,7 @@ import utils
 from torch import nn
 from tqdm import tqdm
 import pandas as pd
-from retain_generator import Generator as RGenerator
+from retain_generator import AttGenerator as RGenerator
 
 # Fixing random seeds
 torch.manual_seed(1368)
