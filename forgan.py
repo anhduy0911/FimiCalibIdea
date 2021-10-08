@@ -200,12 +200,18 @@ class ForGAN:
             rmses.append(np.sqrt(np.square(error).mean()))
             maes.append(np.abs(error).mean())
             mapes.append(np.abs(error / y_test).mean() * 100)
+
         preds = np.vstack(preds)    
-        self.divide_bin(preds)
+        preds_med = self.divide_bin(preds)
         crps = np.absolute(preds[:100] - y_test).mean() - 0.5 * np.absolute(preds[:100] - preds[100:]).mean()
         preds_mean = np.mean(preds, axis=0)
         preds = preds.flatten()
         print(preds_mean.shape) 
+
+        error_med = preds_med - y_test
+        rmse_med = np.sqrt(np.square(error_med).mean())
+        mae_med = np.abs(error_med).mean()
+        mape_med = np.abs(error_med / y_test).mean() * 100
 
         fig, (ax1, ax2) = plt.subplots(1, 2)
         fig.set_figheight(8)
@@ -224,15 +230,31 @@ class ForGAN:
         fig.savefig('img/forgan.png')
 
         kld = utils.calc_kld(preds, y_test, self.opt.hist_bins, self.opt.hist_min, self.opt.hist_max)
-        print("Test resuts:\nRMSE : {}({})\nMAE : {}({})\nMAPE : {}({}) %\nCRPS : {}\nKLD : {}\n"
+        print("Test resuts:\nRMSE : {}({})\nMAE : {}({})\nMAPE : {}({}) %\nCRPS : {}\nKLD : {}\nTest resuts med:\nRMSE : {}\nMAE : {}\nMAPE : {} %"
               .format(np.mean(rmses), np.std(rmses),
                       np.mean(maes), np.std(maes),
                       np.mean(mapes), np.std(mapes),
-                      crps,
-                      kld))
+                      crps, kld, rmse_med, mae_med, mape_med))
 
     def divide_bin(self, preds):
-        print(preds.shape)
+        median_preds = []
+        for i in range(preds.shape[1]):
+            data = preds[:, i]
+            bins = []
+
+            min_dat = min(data)
+            max_dat = max(data)
+            step = (max_dat - min_dat) / 10
+            for j in range(10):
+                bins.append(min_dat + j * step)
+
+            inds = np.digitize(data, bins)
+            most_bin = np.bincount(inds).argmax()
+            pred = (bins[most_bin - 1] + bins[most_bin]) / 2
+            median_preds.append(pred)
+        
+        print(median_preds[:10])
+        return np.array(median_preds)
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
