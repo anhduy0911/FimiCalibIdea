@@ -201,6 +201,7 @@ class ForGAN:
             maes.append(np.abs(error).mean())
             mapes.append(np.abs(error / y_test).mean() * 100)
         preds = np.vstack(preds)    
+        self.divide_bin(preds)
         crps = np.absolute(preds[:100] - y_test).mean() - 0.5 * np.absolute(preds[:100] - preds[100:]).mean()
         preds_mean = np.mean(preds, axis=0)
         preds = preds.flatten()
@@ -230,6 +231,8 @@ class ForGAN:
                       crps,
                       kld))
 
+    def divide_bin(self, preds):
+        print(preds.shape)
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
