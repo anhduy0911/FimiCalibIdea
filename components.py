@@ -11,8 +11,8 @@ class RGenerator(nn.Module):
         self.std = std
 
         if cell_type == "lstm":
-            # self.variable_att = nn.LSTM(input_size=10, hidden_size=10)
-            self.variable_att = nn.Conv1d(in_channels=10, out_channels=10, kernel_size=5,padding=2)
+            self.variable_att = nn.LSTM(input_size=10, hidden_size=10)
+            # self.variable_att = nn.Conv1d(in_channels=10, out_channels=10, kernel_size=5,padding=2)
             # self.step_att = nn.LSTM(input_size=10, hidden_size=1)
             self.cond_to_latent = nn.LSTM(input_size=1,
                                           hidden_size=generator_latent_size,
@@ -27,23 +27,22 @@ class RGenerator(nn.Module):
                       out_features=generator_latent_size),
             nn.ReLU(),
             nn.Linear(in_features=generator_latent_size, out_features=1)
-
         )
 
     def forward(self, noise, condition):
         condition = (condition - self.mean) / self.std
 
-        # condition = condition.transpose(0, 1)
-        # variable_attention_weight, _ = self.variable_att(condition)
-        # variable_attention_weight = nn.Softmax(dim=2)(variable_attention_weight)
+        condition = condition.transpose(0, 1)
+        variable_attention_weight, _ = self.variable_att(condition)
+        variable_attention_weight = nn.Softmax(dim=2)(variable_attention_weight)
 
-        condition = condition.transpose(1, 2)
-        variable_attention_weight= self.variable_att(condition)
-        variable_attention_weight = nn.Softmax(dim=2)(variable_attention_weight.transpose(1, 2))
+        # condition = condition.transpose(1, 2)
+        # variable_attention_weight= self.variable_att(condition)
+        # variable_attention_weight = nn.Softmax(dim=2)(variable_attention_weight.transpose(1, 2))
 
-        w_condition_latent  = condition.transpose(1,2) * variable_attention_weight
+        w_condition_latent  = condition * variable_attention_weight
         condition_sum = torch.sum(w_condition_latent, dim=2)
-        condition_latent, _ = self.cond_to_latent(torch.unsqueeze(condition_sum, dim=2).transpose(0, 1))
+        condition_latent, _ = self.cond_to_latent(torch.unsqueeze(condition_sum, dim=2))
         # condition_latent = condition_latent[-1]
         # print(condition_latent.shape)
         # condition_sum = condition_sum.transpose(0,1)
@@ -250,36 +249,36 @@ class Discriminator(nn.Module):
                                     bidirectional=False, 
                                     num_layers=1)
         
-        # self.variable_att = nn.LSTM(input_size=10, hidden_size=10)
-        self.variable_att = nn.Conv1d(in_channels=10, out_channels=10, kernel_size=5,padding=2)
+        self.variable_att = nn.LSTM(input_size=10, hidden_size=10)
+        # self.variable_att = nn.Conv1d(in_channels=10, out_channels=10, kernel_size=5,padding=2)
 
         if cell_type == "lstm":
             self.input_to_latent = nn.LSTM(input_size=pred_dim,
                                            hidden_size=discriminator_latent_size, 
-                                           bidirectional=True, 
+                                           bidirectional=False, 
                                            num_layers=1)
         else:
             self.input_to_latent = nn.GRU(input_size=1,
                                           hidden_size=discriminator_latent_size)
 
-        # self.conv_dense = nn.Conv1d(in_channels=self.condition_size, out_channels=1, kernel_size=3,padding=1)
+        self.conv_dense = nn.Conv1d(in_channels=self.condition_size, out_channels=1, kernel_size=3,padding=1)
         self.model = nn.Sequential(
-            nn.Linear(in_features=discriminator_latent_size*2, out_features=discriminator_latent_size),
+            nn.Linear(in_features=discriminator_latent_size, out_features=discriminator_latent_size),
             nn.ReLU(),
             nn.Linear(in_features=discriminator_latent_size, out_features=1)
         )
 
     def forward(self, prediction, condition):
         condition = (condition - self.mean) / self.std
-        # condition = condition.transpose(0, 1)
-        # variable_attention_weight, _ = self.variable_att(condition)
-        # variable_attention_weight = nn.Softmax(dim=2)(variable_attention_weight)
+        condition = condition.transpose(0, 1)
+        variable_attention_weight, _ = self.variable_att(condition)
+        variable_attention_weight = nn.Softmax(dim=2)(variable_attention_weight)
 
-        condition = condition.transpose(1, 2)
-        variable_attention_weight = self.variable_att(condition)
-        variable_attention_weight = nn.Softmax(dim=2)(variable_attention_weight.transpose(1,2))
+        # condition = condition.transpose(1, 2)
+        # variable_attention_weight = self.variable_att(condition)
+        # variable_attention_weight = nn.Softmax(dim=2)(variable_attention_weight.transpose(1,2))
 
-        w_condition  = condition.transpose(1,2) * variable_attention_weight
+        w_condition  = condition * variable_attention_weight
         condition_sum = torch.sum(w_condition, dim=2)
 
         prediction = (prediction - self.mean) / self.std
@@ -290,10 +289,10 @@ class Discriminator(nn.Module):
         # d_input = torch.cat((torch.unsqueeze(d_input, 2), condition_reshape), dim=2)
         # print(d_input.size())
         # d_input = d_input.view(-1, self.condition_size, 3)
-        d_input = torch.unsqueeze(d_input, dim=2).transpose(0, 1)
+        d_input = torch.unsqueeze(d_input, dim=2)
         d_latent, _ = self.input_to_latent(d_input)
-        # d_latent = self.conv_dense(d_latent.transpose(0,1))
-        d_latent = d_latent[-1]
+        d_latent = self.conv_dense(d_latent.transpose(0,1))
+        # d_latent = d_latent[-1]
         # print(d_latent.shape)
         output = self.model(torch.squeeze(d_latent))
         return output

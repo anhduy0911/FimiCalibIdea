@@ -87,21 +87,31 @@ def new_dataset():
     envitus = pd.read_csv("Data/fimi/envitus.csv", header=0)
     envitus['datetime'] = pd.to_datetime(envitus['datetime'], format='%Y-%m-%d %H:%M:%S') + datetime.timedelta(seconds=25200) # 7 hours
     envitus['datetime'] = pd.to_datetime(envitus['datetime'], format='%Y-%m-%d %H:%M:%S').dt.round('1min')
+    
+    envitus.index = pd.DatetimeIndex(envitus['datetime'])
+    
+    envitus_mean = pd.DataFrame()
+    envitus_mean['PM2_5'] = envitus['PM2_5'].resample('30Min').mean().round(2)
+    envitus_mean['PM10_0'] = envitus['PM10_0'].resample('30Min').mean().round(2)
+    envitus_mean['temp'] = envitus['temp'].resample('30Min').mean().round(2)
+    envitus_mean['humidity'] = envitus['humidity'].resample('30Min').mean().round(2)
     # envitus.to_csv('Data/fimi/envitus.csv', index=None)
-
-    fimi1 = pd.read_csv("Data/fimi/fimi14.csv", header=0)
+    print(envitus_mean.head())
+    fimi1 = pd.read_csv("Data/fimi/fimi20.csv", header=0)
     fimi1.index = pd.DatetimeIndex(fimi1['datetime'])
 
     mean_fimi1 = pd.DataFrame()
-    mean_fimi1['PM2_5'] = fimi1['PM2_5'].resample('1Min').mean().round(2)
-    mean_fimi1['PM10_0'] = fimi1['PM10_0'].resample('1Min').mean().round(2)
-    mean_fimi1['temp'] = fimi1['temp'].resample('1Min').mean().round(2)
-    mean_fimi1['humidity'] = fimi1['humidity'].resample('1Min').mean().round(2)
+    mean_fimi1['PM2_5'] = fimi1['PM2_5'].resample('30Min').mean().round(2)
+    mean_fimi1['PM10_0'] = fimi1['PM10_0'].resample('30Min').mean().round(2)
+    mean_fimi1['temp'] = fimi1['temp'].resample('30Min').mean().round(2)
+    mean_fimi1['humidity'] = fimi1['humidity'].resample('30Min').mean().round(2)
     # mean_fimi1.to_csv('Data/fimi/mean_fimi1.csv', index=True)
+    print(mean_fimi1.head())
 
-    merged = pd.merge(mean_fimi1, envitus, how='outer', on='datetime')
+    merged = pd.merge(mean_fimi1, envitus_mean, how='inner', on='datetime')
+    print(merged.head())
     clean_dat = pd.DataFrame()
-    clean_dat['datetime'] = merged['datetime']
+    clean_dat.index = merged.index
     clean_dat['PM2_5'] = merged['PM2_5_x']
     clean_dat['PM10_0'] = merged['PM10_0_x']
     clean_dat['temp'] = merged['temp_x']
@@ -113,10 +123,29 @@ def new_dataset():
 
     clean_dat = clean_dat.dropna(axis=0)
     print(clean_dat.head())
-    clean_dat.to_csv('Data/fimi/envitus_fimi14.csv', index=None)
+    clean_dat.to_csv('Data/fimi/envitus_fimi14.csv', index=True)
+
+def resample_dataset():
+    fimi1 = pd.read_csv("Data/fimi/envitus_fimi14.csv", header=0)
+    fimi1.index = pd.DatetimeIndex(fimi1['datetime'])
+
+    mean_fimi1 = pd.DataFrame()
+    mean_fimi1.index = fimi1.index
+    mean_fimi1['PM2_5'] = fimi1['PM2_5'].resample('30Min').mean().round(2)
+    mean_fimi1['PM10_0'] = fimi1['PM10_0'].resample('30Min').mean().round(2)
+    mean_fimi1['temp'] = fimi1['temp'].resample('30Min').mean().round(2)
+    mean_fimi1['humidity'] = fimi1['humidity'].resample('30Min').mean().round(2)
+    mean_fimi1['PM2_5_cal'] = fimi1['PM2_5_cal'].resample('30Min').mean().round(2)
+    mean_fimi1['PM10_0_cal'] = fimi1['PM10_0_cal'].resample('30Min').mean().round(2)
+    mean_fimi1['temp_cal'] = fimi1['temp_cal'].resample('30Min').mean().round(2)
+    mean_fimi1['humidity_cal'] = fimi1['humidity_cal'].resample('30Min').mean().round(2)
+    clean_dat = mean_fimi1.dropna(axis=0)
+    print(clean_dat.head())
+    clean_dat.to_csv('Data/fimi/envitus_fimi14_mean.csv', index=True)
+
 
 def plot_data_new():
-    merged = pd.read_csv("Data/fimi/envitus_fimi14.csv", header=0)
+    merged = pd.read_csv("Data/fimi/envitus_fimi14_mean.csv", header=0)
     fig, (ax1, ax2, ax3) = plt.subplots(3,1, sharex=True)
     ax1.plot(merged['datetime'],merged['PM2_5'], 'b')
     ax1.plot(merged['datetime'],merged['PM2_5_cal'], 'r')
@@ -132,7 +161,7 @@ def plot_data_new():
     plt.show()
 
 def plot_correlation():
-    merged = pd.read_csv("Data/fimi/envitus_fimi14.csv", header=0)
+    merged = pd.read_csv("Data/fimi/envitus_fimi14_mean.csv", header=0)
     
     corr = merged.corr()
     ans = sns.heatmap(corr, xticklabels=corr.columns, yticklabels=corr.columns, annot=True)
@@ -144,6 +173,7 @@ def plot_correlation():
 if __name__ == '__main__':
     # plot_data()
     # new_dataset()
+    # resample_dataset()
     # plot_data_new()
     plot_correlation()
     # plot_data_grim()
