@@ -236,6 +236,9 @@ if __name__ == '__main__':
     x_train, y_train, x_val, y_val, x_test, y_test = utils.prepare_dataset(opt.condition_size, ssa=opt.ssa)
     opt.data_mean = x_train.mean()
     opt.data_std = x_train.std()
+    print(x_train.shape)
+    print(y_train.shape)
+    
     forgan = ForGAN(opt)
     if opt.train_type == 'train':
         forgan.train(x_train, y_train, x_val, y_val)

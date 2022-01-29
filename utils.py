@@ -3,6 +3,13 @@ import pickle
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from sklearn.metrics import classification_report
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import average_precision_score
+from sklearn.preprocessing import label_binarize
+import wandb
+import torch
+import config as CFG
 
 class EarlyStopping():
     """
@@ -33,6 +40,16 @@ class EarlyStopping():
             if self.counter >= self.patience:
                 print('INFO: Early stopping')
                 self.early_stop = True
+
+class MetricLogger:
+    def __init__(self, args=None, tags=None):
+        self.run = wandb.init(args.name, entity='aiotlab', config=args, tags=tags, group='Conditioned_LSTM')
+        self.type = '_'.join(tags)
+        self.run.name = args.name + '_' + self.type
+        self.train = tags[0] == 'train'
+
+    def log_metrics(self, step, metrics):
+        self.run.log(data=metrics, step=step)
 
 class SSA(object):
 
@@ -245,10 +262,109 @@ def prepare_dataset(condition_size=None, pred_size=0, multistep=False, ssa=False
     
         return x_train, y_train, x_val, y_val, x_test, y_test
 
-if __name__ == '__main__':
-    x_train, y_train, x_val, y_val, x_test, y_test = prepare_dataset(condition_size=6, ssa=True)
-    print(x_train.shape)
-    print(y_val.shape)
 
-    data_file = "Data/fimi/envitus_fimi14.csv"
-    get_input_data(data_file, 20)
+def prepare_multicalib_dataset(input_len=CFG.input_timestep, output_len=CFG.output_timestep, ids=CFG.devices, atts=CFG.attributes):
+    dts = pd.read_csv('Data/fimi_resample/envitus_fimi_overlapped.csv', header=0)
+    
+    xs = []
+    ys = []
+    labels = []
+
+    for idx, id in enumerate(ids):
+        ls_att = ['_'.join([a, id]) for a in atts]
+        print(ls_att)
+        if id == 'e':
+            for i in range(output_len, dts.shape[0]):
+                y_i = dts[ls_att][i - output_len:i]
+                ys.append(y_i)
+        else:
+            xis = []
+            labs = []
+            for i in range(input_len, dts.shape[0]):
+                x_i = dts[ls_att][i - input_len:i]
+                xis.append(x_i)
+                
+                lab = [0 for _ in range(len(ids) - 1)]
+                lab[idx-1] = 1
+                labs.append(lab)
+            xs.append(np.array(xis))
+            labels.append(labs)
+
+    xs = np.array(xs).transpose(1, 0, 2, 3)
+    ys = np.array(ys)[:, np.newaxis, :, :]
+    ys = np.repeat(ys, len(ids) - 1, axis=1)
+    labels = np.array(labels).transpose(1, 0, 2)
+
+    print(xs.shape)
+    print(ys.shape)
+    print(labels.shape)
+
+    x_train = xs[:int(xs.shape[0] * 0.5)]
+    y_train = ys[:int(xs.shape[0] * 0.5)]
+    labels_train = labels[:int(xs.shape[0] * 0.5)]
+    x_val = xs[int(xs.shape[0] * 0.5):int(xs.shape[0] * 0.6)]
+    y_val = ys[int(xs.shape[0] * 0.5):int(xs.shape[0] * 0.6)]
+    labels_val = labels[int(xs.shape[0] * 0.5):int(xs.shape[0] * 0.6)]
+    x_test = xs[int(xs.shape[0] * 0.6):]
+    y_test = ys[int(xs.shape[0] * 0.6):]
+    labels_test = labels[int(xs.shape[0] * 0.6):]
+    return x_train, y_train, labels_train, x_val, y_val, labels_val, x_test, y_test, labels_test
+
+def prepare_single_dataset(input_len=CFG.input_timestep, output_len=CFG.output_timestep, idex='3', atts=CFG.attributes):
+    dts = pd.read_csv('Data/fimi_resample/envitus_fimi_overlapped.csv', header=0)
+    
+    xs = []
+    ys = []
+    labels = []
+
+    ids = ['e', idex]
+    for idx, id in enumerate(ids):
+        ls_att = ['_'.join([a, id]) for a in atts]
+        print(ls_att)
+        if id == 'e':
+            for i in range(output_len, dts.shape[0]):
+                y_i = dts[ls_att][i - output_len:i]
+                ys.append(y_i)
+        else:
+            for i in range(input_len, dts.shape[0]):
+                x_i = dts[ls_att][i - input_len:i]
+                lab = [0 for _ in range(len(ids) - 1)]
+                lab[idx-1] = 1
+                xs.append(x_i)
+                labels.append(lab)
+
+    xs = np.array(xs)
+    ys = np.array(ys)
+    labels = np.array(labels)
+
+    print(xs.shape)
+    print(ys.shape)
+    print(labels.shape)
+
+    x_train = xs[:int(xs.shape[0] * 0.5)]
+    y_train = ys[:int(xs.shape[0] * 0.5)]
+    labels_train = labels[:int(xs.shape[0] * 0.5)]
+    x_val = xs[int(xs.shape[0] * 0.5):int(xs.shape[0] * 0.6)]
+    y_val = ys[int(xs.shape[0] * 0.5):int(xs.shape[0] * 0.6)]
+    labels_val = labels[int(xs.shape[0] * 0.5):int(xs.shape[0] * 0.6)]
+    x_test = xs[int(xs.shape[0] * 0.6):]
+    y_test = ys[int(xs.shape[0] * 0.6):]
+    labels_test = labels[int(xs.shape[0] * 0.6):]
+    return x_train, y_train, labels_train, x_val, y_val, labels_val, x_test, y_test, labels_test
+
+if __name__ == '__main__':
+    # x_train, y_train, x_val, y_val, x_test, y_test = prepare_dataset(condition_size=6, ssa=True)
+    # print(x_train.shape)
+    # print(y_val.shape)
+
+    # data_file = "Data/fimi/envitus_fimi14.csv"
+    # get_input_data(data_file, 20)
+    # dts = pd.read_csv('Data/fimi_resample/envitus_fimi_overlapped.csv', header=0)
+    # atts = ['PM2_5_e', 'PM10_e', 'temp_e', 'humidity_e']
+
+    # print(dts[atts][:5].values)
+    x_tr, y_tr, lab_tr, _, _, _, _, _, _ = prepare_single_dataset()
+    print(x_tr.shape)
+    print(y_tr.shape)
+    print(lab_tr.shape)
+

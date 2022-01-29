@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/mnt/disk1/duyna/FimiCalibIdea/main.py", line 51, in <module>
+    model.train()
+  File "/mnt/disk1/duyna/FimiCalibIdea/multicalib.py", line 55, in train
+    pred = self.model(x, lab)
+  File "/home/aiotlab/anaconda3/envs/thanhnt_vaipe/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1102, in _call_impl
+    return forward_call(*input, **kwargs)
+TypeError: forward() takes 2 positional arguments but 3 were given

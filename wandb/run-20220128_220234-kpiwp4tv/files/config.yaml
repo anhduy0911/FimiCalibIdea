@@ -1,0 +1,52 @@
+wandb_version: 1
+
+_wandb:
+  desc: null
+  value:
+    cli_version: 0.12.9
+    framework: torch
+    is_jupyter_run: false
+    is_kaggle_kernel: true
+    python_version: 3.9.9
+    start_time: 1643382154
+    t:
+      1:
+      - 1
+      - 5
+      2:
+      - 1
+      - 5
+      3:
+      - 15
+      - 16
+      - 17
+      4: 3.9.9
+      5: 0.12.9
+      8:
+      - 2
+      - 5
+data_mean:
+  desc: null
+  value:
+  - 14.781653457499527
+  - 17.640721220527045
+data_std:
+  desc: null
+  value:
+  - 3.585194498607644
+  - 3.5726164148033988
+early_stop:
+  desc: null
+  value: 50
+metric:
+  desc: null
+  value: mse
+name:
+  desc: null
+  value: Singlecalib
+ssa:
+  desc: null
+  value: false
+train_type:
+  desc: null
+  value: train

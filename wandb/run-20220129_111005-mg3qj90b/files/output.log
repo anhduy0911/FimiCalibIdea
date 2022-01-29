@@ -1,0 +1,18 @@
+
+Epoch:   1/500, MSE_val: 200.5613, MAE_val: 9.8485
+Epoch:   2/500, MSE_val: 134.0949, MAE_val: 8.1818
+Epoch:   3/500, MSE_val: 128.7289, MAE_val: 7.7945
+Epoch:   4/500, MSE_val: 98.9403, MAE_val: 6.7680
+Epoch:   5/500, MSE_val: 91.5862, MAE_val: 6.4052
+Epoch:   6/500, MSE_val: 90.3687, MAE_val: 6.1550
+Epoch:   7/500, MSE_val: 93.5629, MAE_val: 6.0833
+Traceback (most recent call last):
+  File "/mnt/disk1/duyna/FimiCalibIdea/main.py", line 51, in <module>
+    model.train()
+  File "/mnt/disk1/duyna/FimiCalibIdea/multicalib.py", line 63, in train
+    loss.backward()
+  File "/home/aiotlab/anaconda3/envs/thanhnt_vaipe/lib/python3.9/site-packages/torch/_tensor.py", line 307, in backward
+    torch.autograd.backward(self, gradient, retain_graph, create_graph, inputs=inputs)
+  File "/home/aiotlab/anaconda3/envs/thanhnt_vaipe/lib/python3.9/site-packages/torch/autograd/__init__.py", line 154, in backward
+    Variable._execution_engine.run_backward(
+KeyboardInterrupt

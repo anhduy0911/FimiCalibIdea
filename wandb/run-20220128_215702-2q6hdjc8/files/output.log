@@ -1,0 +1,57 @@
+Epoch:   1/500, MSE_val: 339.5167, MAE_val: 17.0945
+Epoch:   2/500, MSE_val: 131.1181, MAE_val: 9.2409
+Epoch:   3/500, MSE_val: 62.3291, MAE_val: 5.7070
+Epoch:   4/500, MSE_val: 51.2775, MAE_val: 5.4283
+/home/aiotlab/anaconda3/envs/thanhnt_vaipe/lib/python3.9/site-packages/torch/nn/modules/loss.py:520: UserWarning: Using a target size (torch.Size([32, 1, 2])) that is different to the input size (torch.Size([32, 7, 2])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  return F.mse_loss(input, target, reduction=self.reduction)
+/home/aiotlab/anaconda3/envs/thanhnt_vaipe/lib/python3.9/site-packages/torch/nn/modules/loss.py:520: UserWarning: Using a target size (torch.Size([2, 1, 2])) that is different to the input size (torch.Size([2, 7, 2])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  return F.mse_loss(input, target, reduction=self.reduction)
+/home/aiotlab/anaconda3/envs/thanhnt_vaipe/lib/python3.9/site-packages/torch/nn/modules/loss.py:520: UserWarning: Using a target size (torch.Size([1, 1, 2])) that is different to the input size (torch.Size([1, 7, 2])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  return F.mse_loss(input, target, reduction=self.reduction)
+Epoch:   5/500, MSE_val: 43.1382, MAE_val: 4.9373
+Epoch:   6/500, MSE_val: 27.5889, MAE_val: 3.8276
+Epoch:   7/500, MSE_val: 22.2502, MAE_val: 3.4084
+Epoch:   8/500, MSE_val: 23.9425, MAE_val: 3.5919
+Epoch:   9/500, MSE_val: 21.6568, MAE_val: 3.5760
+Epoch:  10/500, MSE_val: 20.7684, MAE_val: 3.4302
+Epoch:  11/500, MSE_val: 17.7098, MAE_val: 3.1284
+Epoch:  12/500, MSE_val: 19.0086, MAE_val: 3.5094
+Epoch:  13/500, MSE_val: 22.7996, MAE_val: 3.7949
+Epoch:  14/500, MSE_val: 23.2833, MAE_val: 3.9178
+Epoch:  15/500, MSE_val: 13.5862, MAE_val: 2.9223
+Epoch:  16/500, MSE_val: 18.2424, MAE_val: 3.4459
+Epoch:  17/500, MSE_val: 16.5341, MAE_val: 3.2420
+Epoch:  18/500, MSE_val: 17.8329, MAE_val: 3.3672
+Epoch:  19/500, MSE_val: 18.7113, MAE_val: 3.4079
+Epoch:  20/500, MSE_val: 14.9450, MAE_val: 3.0152
+Epoch:  21/500, MSE_val: 26.1612, MAE_val: 4.2788
+Epoch:  22/500, MSE_val: 50.2118, MAE_val: 6.0864
+Epoch:  23/500, MSE_val: 18.5568, MAE_val: 3.4977
+Epoch:  24/500, MSE_val: 30.3194, MAE_val: 4.6291
+Epoch:  25/500, MSE_val: 17.2842, MAE_val: 3.5368
+Epoch:  26/500, MSE_val: 18.3413, MAE_val: 3.5418
+Epoch:  27/500, MSE_val: 18.0987, MAE_val: 3.4321
+Epoch:  28/500, MSE_val: 17.7921, MAE_val: 3.4494
+Epoch:  29/500, MSE_val: 22.0072, MAE_val: 3.9676
+Epoch:  30/500, MSE_val: 27.6601, MAE_val: 4.6192
+Epoch:  31/500, MSE_val: 28.4066, MAE_val: 4.4237
+Traceback (most recent call last):
+  File "/mnt/disk1/duyna/FimiCalibIdea/main.py", line 51, in <module>
+    model.train()
+  File "/mnt/disk1/duyna/FimiCalibIdea/single_calib.py", line 48, in train
+    for x, y, lab in self.train_loader:
+  File "/home/aiotlab/anaconda3/envs/thanhnt_vaipe/lib/python3.9/site-packages/torch/utils/data/dataloader.py", line 521, in __next__
+    data = self._next_data()
+  File "/home/aiotlab/anaconda3/envs/thanhnt_vaipe/lib/python3.9/site-packages/torch/utils/data/dataloader.py", line 561, in _next_data
+    data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
+  File "/home/aiotlab/anaconda3/envs/thanhnt_vaipe/lib/python3.9/site-packages/torch/utils/data/_utils/fetch.py", line 49, in fetch
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/home/aiotlab/anaconda3/envs/thanhnt_vaipe/lib/python3.9/site-packages/torch/utils/data/_utils/fetch.py", line 49, in <listcomp>
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/mnt/disk1/duyna/FimiCalibIdea/Data/calib_loader.py", line 15, in __getitem__
+    return self.xs[idx], self.ys[idx], self.labs[idx]
+KeyboardInterrupt
+Epoch:  32/500, MSE_val: 20.6949, MAE_val: 3.7832
+Epoch:  33/500, MSE_val: 23.3450, MAE_val: 4.2361
+Epoch:  34/500, MSE_val: 31.4171, MAE_val: 4.7648
+Epoch:  35/500, MSE_val: 31.2737, MAE_val: 4.2081
