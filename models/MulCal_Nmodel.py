@@ -3,7 +3,7 @@ import torch.nn as nn
 from models.modules import *
 
 class MulCal(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim, n_class, device, mean, std):
+    def __init__(self, input_dim, hidden_dim, output_dim, n_class, device, mean, std, use_n=True):
         super(MulCal, self).__init__()
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
@@ -11,10 +11,15 @@ class MulCal(nn.Module):
         self.device = device
         self.data_mean = torch.tensor(mean, dtype=torch.float32, device=device)
         self.data_std = torch.tensor(std, dtype=torch.float32, device=device)
-        print(self.data_mean)
+        # print(self.data_mean)
         self.n_class = n_class
-
-        self.models = nn.ModuleList([SingleCal(input_dim, hidden_dim, output_dim, device, mean[i], std[i]) for i in range(n_class)])
+        self.use_n = use_n
+        if self.use_n:
+            self.models = nn.ModuleList([SingleCal(input_dim, hidden_dim, output_dim, device, mean[i], std[i]) for i in range(n_class)])
+        else:
+            mean = mean.mean(0)
+            std = std.mean(0)
+            self.model = SingleCal(input_dim, hidden_dim, output_dim, device, mean, std)
 
     def forward(self, input, label):
         '''
@@ -32,7 +37,11 @@ class MulCal(nn.Module):
             input_i = input[:, i, :, :]
             label_i = label[:, i, :]
 
-            calib_output = self.models[i](input_i)
+            if self.use_n:
+                calib_output = self.models[i](input_i)
+            else:
+                calib_output = self.model(input_i)
+
             calib_outs.append(calib_output)
 
         calib_outs = torch.stack(calib_outs, dim=1)

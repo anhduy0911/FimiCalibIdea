@@ -1,6 +1,0 @@
-Traceback (most recent call last):
-  File "/mnt/disk1/duyna/FimiCalibIdea/main.py", line 51, in <module>
-    model.train()
-  File "/mnt/disk1/duyna/FimiCalibIdea/multicalib.py", line 61, in train
-    print(mape)
-UnboundLocalError: local variable 'mape' referenced before assignment

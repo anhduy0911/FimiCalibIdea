@@ -172,7 +172,7 @@ def resample_data(file_name, envitus=False):
 def plot_data_new():
     merged = pd.read_csv("Data/fimi_resample/envitus_fimi_overlapped.csv", header=0)
     atts = ['PM2_5', 'PM10', 'temp', 'humidity', 'CO', 'NO2', 'SO2']
-    devices = ['e', '3', '8', '14', '20', '30']
+    devices = ['e', '1', '14', '20', '27', '30']
 
     fig, axes = plt.subplots(2,4, figsize=(25,10))
     axes = axes.flatten()
@@ -199,7 +199,7 @@ def plot_correlation():
 
 def merge_data():
     path = 'Data/fimi_resample/'
-    names = ['fimi_1.csv', 'fimi_3.csv', 'fimi_8.csv', 'fimi_14.csv', 'fimi_20.csv', 'fimi_23.csv', 'fimi_25.csv', 'fimi_27.csv', 'fimi_30.csv']
+    names = ['fimi_1.csv', 'fimi_3.csv', 'fimi_8.csv', 'fimi_14.csv', 'fimi_20.csv', 'fimi_27.csv', 'fimi_28.csv', 'fimi_30.csv']
     
     merged = pd.read_csv(path + 'envitus.csv', header=0)
     for name in names:
@@ -214,7 +214,7 @@ def rename_column():
     data = pd.read_csv('Data/fimi_resample/envitus_fimi.csv', header=0)
     # i_columns = data.columns
     atts = ['PM2_5', 'PM10', 'temp', 'humidity', 'CO', 'NO2', 'SO2']
-    devices = ['e', '1', '3', '8', '14', '20', '23', '25', '27', '30']
+    devices = ['e', '1', '3', '8', '14', '20', '27', '28', '30']
     m_columns = []
     
     for device in devices:
@@ -238,7 +238,7 @@ def test_overlap():
     e_nan_idx_na = set(e_nan_idx_na)
     e_nan_idx = e_nan_idx_null.intersection(e_nan_idx_na)
 
-    devices = ['1', '3', '8', '14', '20', '23', '25', '27', '30']
+    devices = ['1', '3', '8', '14', '20', '27', '28', '30']
     
     intersects = {}
     for device in devices:
@@ -253,7 +253,7 @@ def test_overlap():
     
     print(intersects)
 
-    filtered_devices = ['3', '8', '14', '20', '30']
+    filtered_devices = ['1', '14', '20', '27', '30']
 
     ovl_idx = e_nan_idx
     for device in filtered_devices:
@@ -274,12 +274,12 @@ def test_overlap():
     
 if __name__ == '__main__':
     # plot_correlation()
-    # names = ['fimi_1', 'fimi_3', 'fimi_8', 'fimi_14', 'fimi_20', 'fimi_23', 'fimi_25', 'fimi_27', 'fimi_30']
+    # names = ['fimi_1', 'fimi_3', 'fimi_8', 'fimi_14', 'fimi_20', 'fimi_27', 'fimi_28', 'fimi_30']
     # for name in names:
     #     resample_data(name + '.csv')
     
-    # resample_data('envitus.csv', envitus=True)
+    resample_data('envitus.csv', envitus=True)
     # merge_data()
     # rename_column()
-    plot_data_new()
+    # plot_data_new()
     # test_overlap()

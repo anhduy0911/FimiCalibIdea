@@ -2,8 +2,8 @@ import argparse
 from single_calib import SingleCalibModel
 import utils
 from forgan import ForGAN
+# from multicalib_Nmodel import MultiCalibModel
 from multicalib import MultiCalibModel
-    
 
 def seed_everything(seed: int):
     import random, os
@@ -31,21 +31,27 @@ if __name__ == '__main__':
                     help="train")
     ap.add_argument("-name", metavar='', dest="name", type=str, default='multi',
                     help="name of the model - project")
+    ap.add_argument("-usen", metavar='', dest="use_n", type=bool, default=False,
+                    help="whether to use n model or only one")
     opt = ap.parse_args()
 
-    x_train, y_train, lab_train, x_val, y_val, lab_val, x_test, y_test, lab_test = utils.prepare_multicalib_dataset()
+    # x_train, y_train, lab_train, x_val, y_val, lab_val, x_test, y_test, lab_test = utils.prepare_multicalib_dataset()
+    x_train, y_train, lab_train, x_val, y_val, lab_val, x_test, y_test, lab_test = utils.prepare_multicalib_dataset(single=True)
+   
     x_mean = x_train.mean(axis=0)
     print(x_mean.shape)
+    # x_mean = x_mean.mean(axis=0)
     x_mean = x_mean.mean(axis=1)
-    print(x_mean.shape)
-    x_std = x_train.std(axis=0)
-    x_std = x_std.mean(axis=1)
     # print(x_mean.shape)
+    x_std = x_train.std(axis=0)
+    # x_std = x_std.mean(axis=0)
+    x_std = x_std.mean(axis=1)
+    print(x_std.shape)
     opt.data_mean = x_mean
     opt.data_std = x_std
 
     seed_everything(911)
-    model = MultiCalibModel(opt, x_train, y_train, lab_train, x_val, y_val, lab_val, x_test, y_test, lab_test)
+    model = MultiCalibModel(opt, x_train, y_train, lab_train, x_val, y_val, lab_val, x_test, y_test, lab_test, use_n=opt.use_n)
     # model = SingleCalibModel(opt, x_train, y_train, lab_train, x_val, y_val, lab_val, x_test, y_test, lab_test)
     if opt.train_type == 'train':
         model.train()

@@ -263,7 +263,7 @@ def prepare_dataset(condition_size=None, pred_size=0, multistep=False, ssa=False
         return x_train, y_train, x_val, y_val, x_test, y_test
 
 
-def prepare_multicalib_dataset(input_len=CFG.input_timestep, output_len=CFG.output_timestep, ids=CFG.devices, atts=CFG.attributes):
+def prepare_multicalib_dataset(input_len=CFG.input_timestep, output_len=CFG.output_timestep, ids=CFG.devices, atts=CFG.attributes, single=False):
     dts = pd.read_csv('Data/fimi_resample/envitus_fimi_overlapped.csv', header=0)
     
     xs = []
@@ -294,6 +294,11 @@ def prepare_multicalib_dataset(input_len=CFG.input_timestep, output_len=CFG.outp
     ys = np.array(ys)[:, np.newaxis, :, :]
     ys = np.repeat(ys, len(ids) - 1, axis=1)
     labels = np.array(labels).transpose(1, 0, 2)
+
+    if single:
+        xs = xs.squeeze()
+        ys = ys.squeeze()
+        labels = labels.squeeze()
 
     print(xs.shape)
     print(ys.shape)
@@ -352,6 +357,39 @@ def prepare_single_dataset(input_len=CFG.input_timestep, output_len=CFG.output_t
     labels_test = labels[int(xs.shape[0] * 0.6):]
     return x_train, y_train, labels_train, x_val, y_val, labels_val, x_test, y_test, labels_test
 
+def plot_mulidevice_dataset(ids=CFG.devices, atts=['PM2_5']):
+    dts = pd.read_csv('Data/fimi_resample/envitus_fimi_overlapped.csv', header=0)
+    gtruth_attr = ['_'.join([a, 'e']) for a in atts]
+    gtruth = dts[gtruth_attr].values
+    range_idx = range(len(gtruth)) 
+    print(gtruth.shape)
+    fig, ax = plt.subplots(1, len(ids), figsize=(20, 5))
+
+    for idx, id in enumerate(ids):
+        ls_att = ['_'.join([a, id]) for a in atts]
+        raw_i = dts[ls_att].values
+        ax[idx].plot(range_idx, raw_i, 'g', label='raw')
+        ax[idx].plot(range_idx, gtruth, 'b', label='gtruth')
+        ax[idx].legend(loc='best')
+        ax[idx].set_title(f"device: {id}")
+
+    fig.savefig(f"./logs/figures/multicalib_dts.png")
+
+def plot_xtrain(xtrain, ytrain, ids=CFG.devices):
+    fig, ax = plt.subplots(1, len(ids) - 1, figsize=(20, 5))
+    range_idx = range(len(xtrain))
+    for idx, id in enumerate(ids):
+        if idx == 0:
+            continue
+        raw_i = xtrain[:, idx - 1, 0, 0]
+        gtruth_i = ytrain[:, idx - 1, 0, 0]
+        ax[idx-1].plot(range_idx, raw_i, 'g', label='raw')
+        ax[idx-1].plot(range_idx, gtruth_i, 'b', label='gtruth')
+        ax[idx-1].legend(loc='best')
+        ax[idx-1].set_title(f"device: {id}")
+
+    fig.savefig(f"./logs/figures/train_dts.png")
+
 if __name__ == '__main__':
     # x_train, y_train, x_val, y_val, x_test, y_test = prepare_dataset(condition_size=6, ssa=True)
     # print(x_train.shape)
@@ -363,8 +401,9 @@ if __name__ == '__main__':
     # atts = ['PM2_5_e', 'PM10_e', 'temp_e', 'humidity_e']
 
     # print(dts[atts][:5].values)
-    x_tr, y_tr, lab_tr, _, _, _, _, _, _ = prepare_single_dataset()
-    print(x_tr.shape)
-    print(y_tr.shape)
-    print(lab_tr.shape)
-
+    x_tr, y_tr, lab_tr, _, _, _, x_ts, y_ts, _ = prepare_multicalib_dataset()
+    # print(x_tr.shape)
+    # print(y_tr.shape)
+    # print(lab_tr.shape)
+    # plot_mulidevice_dataset()
+    plot_xtrain(x_ts, y_ts)

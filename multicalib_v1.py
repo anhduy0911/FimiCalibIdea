@@ -36,14 +36,16 @@ class MultiCalibModel:
 
         optimizer = torch.optim.AdamW(self.model.parameters(), lr=CFG.lr)
         criteria = nn.MSELoss()
+        criteria_lab = nn.CrossEntropyLoss()
         criteria = criteria.to(self.device)
+        criteria_lab = criteria_lab.to(self.device)
 
         log_dict = {}
         logger = MetricLogger(self.args, tags=['train', 'val'])
         
         for epoch in range(CFG.epochs):
             self.model.train()
-            mse_train, mae_train, mape_train = 0, 0, 0
+            mse_train, mae_train, ce_train = 0, 0, 0
             cnt = 0
             for x, y, lab in self.train_loader:
                 cnt += 1
@@ -52,51 +54,60 @@ class MultiCalibModel:
                 lab = lab.to(self.device)
                 self.model.zero_grad()
 
-                pred = self.model(x, lab)
+                ident, pred = self.model(x)
                 # print(pred.shape)
                 # print(y.shape)
                 loss = criteria(pred, y)
+                loss_lab = criteria_lab(ident, lab)
+
                 mae = torch.mean(torch.abs(pred - y))
                 # mape = torch.mean(torch.abs((pred - y) / y)) * 100
                 # print(mape)
 
                 mse_train += loss
                 mae_train += mae
+                ce_train += loss_lab
                 # mape_train += mape
-                loss.backward()
+                loss.backward(retain_graph=True)
+                loss_lab.backward()
                 optimizer.step()
             
             mse_train /= cnt
             mae_train /= cnt
+            ce_train /= cnt
             # mape_train /= cnt
 
             log_dict['train/mse'] = mse_train
             log_dict['train/mae'] = mae_train
+            log_dict['train/cross_entropy'] = ce_train
             # log_dict['train/mape'] = mape_train
             # validation
             self.model.eval()
-            mse, mae, mape = 0, 0, 0
+            mse, mae, ce = 0, 0, 0
             cnt = 0
             for x, y, lab in self.val_loader:
                 cnt += 1
                 x = x.to(self.device)
                 y = y.to(self.device)
                 lab = lab.to(self.device)
-                pred = self.model(x, lab)
+                ident, pred = self.model(x)
 
                 mse += criteria(pred, y)
                 mae += torch.abs(pred - y).mean()
+                ce += criteria_lab(ident, lab)
                 # mape += torch.mean(torch.abs((pred - y) / y)) * 100
             mse /= cnt
             mae /= cnt
+            ce /= cnt
             # mape /= cnt
 
             log_dict['val/mse'] = mse
             log_dict['val/mae'] = mae
+            log_dict['val/cross_entropy'] = ce
             # log_dict['val/mape'] = mape
             logger.log_metrics(epoch, log_dict)
             # print(log_dict)
-            print(f"Epoch: {epoch+1:3d}/{CFG.epochs:3d}, MSE_val: {mse:.4f}, MAE_val: {mae:.4f}")
+            print(f"Epoch: {epoch+1:3d}/{CFG.epochs:3d}, MSE_val: {mse:.4f}, MAE_val: {mae:.4f}, CE_val: {ce:.4f}")
             self.es(mse)
 
             if mse < best_mse:
@@ -120,7 +131,7 @@ class MultiCalibModel:
             x = x.to(self.device)
             y = y.to(self.device)
             lab = lab.to(self.device)
-            pred = self.model(x, lab)
+            _, pred = self.model(x)
 
             preds.append(pred.cpu().detach().numpy())
             mse += torch.mean((pred - y) ** 2)

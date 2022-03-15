@@ -7,7 +7,7 @@ from Data.calib_loader import CalibDataset
 import config as CFG
 import matplotlib.pyplot as plt
 class MultiCalibModel:
-    def __init__(self, args, x_train, y_train, lab_train, x_val, y_val, lab_val, x_test, y_test, lab_test, devices=CFG.devices):
+    def __init__(self, args, x_train, y_train, lab_train, x_val, y_val, lab_val, x_test, y_test, lab_test, devices=CFG.devices, use_n=False):
         self.args = args
         self.train_loader = torch.utils.data.DataLoader(CalibDataset(x_train, y_train, lab_train), batch_size=CFG.batch_size, shuffle=True)
         self.val_loader = torch.utils.data.DataLoader(CalibDataset(x_val, y_val, lab_val), batch_size=CFG.batch_size, shuffle=True)
@@ -16,7 +16,7 @@ class MultiCalibModel:
         self.x_test = x_test
         self.y_test = y_test
 
-        self.device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+        self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         self.es = EarlyStopping(self.args.early_stop)
 
         print(f"Use device: {self.device}")
@@ -101,15 +101,16 @@ class MultiCalibModel:
 
             if mse < best_mse:
                 best_mse = mse
-                torch.save(self.model.state_dict(), "./logs/checkpoints/best_model_multi.pt")
+                torch.save(self.model.state_dict(), f"./logs/checkpoints/{self.args.name}_best.pt")
             else: 
-                torch.save(self.model.state_dict(), "./logs/checkpoints/last_model_multi.pt")
+                torch.save(self.model.state_dict(), f"./logs/checkpoints/{self.args.name}_last.pt")
+                # self.model.load_state_dict(torch.load(f"./logs/checkpoints/{self.args.name}_best.pt"))
                 if (self.es.early_stop):
                     print("Early stopping")
                     break
     
     def test(self):
-        self.model.load_state_dict(torch.load("./logs/checkpoints/best_model_multi.pt"))
+        self.model.load_state_dict(torch.load(f"./logs/checkpoints/{self.args.name}_best.pt"))
         
         self.model.eval()
         mse, mae, mape = 0, 0, 0
@@ -148,4 +149,4 @@ class MultiCalibModel:
             ax[i].legend(loc='best')
             ax[i].set_title(f"device: {idx}")
         
-        fig.savefig("./logs/figures/multi_test.png")
+        fig.savefig(f"./logs/figures/{self.args.name}_test.png")
