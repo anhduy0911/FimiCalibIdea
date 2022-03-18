@@ -16,6 +16,7 @@ class MultiCalibModel:
         self.val_loader = torch.utils.data.DataLoader(CalibDataset(x_val, y_val, lab_val), batch_size=CFG.batch_size, shuffle=True)
         self.test_loader = torch.utils.data.DataLoader(CalibDataset(x_test, y_test, lab_test), batch_size=CFG.batch_size, shuffle=False)
         self.use_n = use_n
+        print(f'use_n: {self.use_n}')
         self.n_devices = len(devices) - 1
 
         self.x_test = x_test
@@ -114,6 +115,8 @@ class MultiCalibModel:
             mse, mae, mape = 0, 0, 0
             cnt = 0
             for x, y, lab in self.val_loader:
+                if self.use_n:
+                    losses = []
                 cnt += 1
                 x = x.to(self.device)
                 y = y.to(self.device)
@@ -126,11 +129,16 @@ class MultiCalibModel:
                         self.models[i].zero_grad()
                         calib_output = self.models[i](input_i)
                         loss = criterias[i](calib_output, y_i)
+                        losses.append(loss)
                     else:
                         self.model.zero_grad()
                         calib_output = self.model(input_i)
                         loss = criteria(calib_output, y_i)
 
+                if self.use_n:
+                    print(losses)
+                    loss = torch.mean(torch.stack(losses))
+                
                 mse += loss
                 mae += torch.abs(calib_output - y_i).mean()
                 # mape += torch.mean(torch.abs((pred - y) / y)) * 100
@@ -215,21 +223,24 @@ class MultiCalibModel:
 
         print(f"MSE_test: {mse:.4f}, MAE_test: {mae:.4f}, MAPE_test: {mape:.4f}")
     
-        ids = CFG.devices
-        ids.pop(0)
-        fig, ax = plt.subplots(1, len(ids), figsize=(20, 5))
+        ids = self.args.device_ids[1:]
+        print(ids)
+        atts = self.args.attributes
+        fig, ax = plt.subplots(len(atts), len(ids), figsize=(20, 25))
         for i, idx in enumerate(ids):
-            x_i = self.x_test[:, i, 0, 0]
-            y_i = self.y_test[:, i, 0, 0]
-            pred_i = preds[:, i, 0, 0]
+            for j, att in enumerate(atts):
+                x_i = self.x_test[:, i, 0, j]
+                y_i = self.y_test[:, i, 0, j]
+                pred_i = preds[:, i, 0, j]
 
-            rn_test = range(x_i.shape[0])
-            
-            ax[i].plot(rn_test, x_i, 'g', label='raw')
-            ax[i].plot(rn_test, y_i, 'b', label='gtruth')
-            ax[i].plot(rn_test, pred_i, 'r', label='calibrated')
-            ax[i].legend(loc='best')
-            ax[i].set_title(f"device: {idx}")
-        
+                rn_test = range(x_i.shape[0])
+                ax[j, i].plot(rn_test, x_i, 'g', label='raw')
+                ax[j, i].plot(rn_test, y_i, 'b', label='gtruth')
+                ax[j, i].plot(rn_test, pred_i, 'r', label='calibrated')
+                ax[j, i].legend(loc='best')
+                ax[j, i].set_title(f"device: {idx}")
+                ax[j, i].set_xlabel("time")
+                ax[j, i].set_ylabel(att)
+
         fig.savefig(f"./logs/figures/{self.args.name}_test.png")
         # fig.savefig("./logs/figures/multi_test.png")

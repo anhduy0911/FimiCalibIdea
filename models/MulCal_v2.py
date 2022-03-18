@@ -16,7 +16,7 @@ class MulCal(nn.Module):
 
         self.extractor = SeriesEncoder(input_dim, hidden_dim)
         self.identity = IdentityLayer_v2(hidden_dim * 2, hidden_dim, n_class)
-        self.calib = IdentityAwaredCalibModule(device, hidden_dim * 2, output_dim)
+        self.calib = IdentityAwaredCalibModule_v3(device, hidden_dim * 2, output_dim)
 
     def forward(self, input, label):
         '''

@@ -49,7 +49,7 @@ class IdentityLayer_v2(nn.Module):
         self.module = nn.Sequential(
             nn.Linear(in_features=nclass, out_features=hidden_dim),
             nn.Tanh(),
-            nn.Linear(in_features=hidden_dim, out_features=input_dim)
+            nn.Linear(in_features=hidden_dim, out_features=hidden_dim)
         )
         
     def forward(self, x):
@@ -63,7 +63,7 @@ class ConditionedLSTMCell(jit.ScriptModule):
         self.hidden_size = hidden_size
         self.weight_ih = Parameter(torch.randn(4 * hidden_size, input_size))
         self.weight_hh = Parameter(torch.randn(4 * hidden_size, hidden_size))
-        self.weight_ii = Parameter(torch.randn(4 * hidden_size, input_size))
+        self.weight_ii = Parameter(torch.randn(4 * hidden_size, hidden_size))
 
         self.bias_ih = Parameter(torch.randn(4 * hidden_size))
         self.bias_hh = Parameter(torch.randn(4 * hidden_size))
@@ -96,11 +96,13 @@ class ConditionedLSTMCellVer2(jit.ScriptModule):
         self.hidden_size = hidden_size
         self.weight_ih = Parameter(torch.randn(4 * hidden_size, input_size))
         self.weight_hh = Parameter(torch.randn(4 * hidden_size, hidden_size))
-        self.weight_ii = Parameter(torch.randn(hidden_size, input_size))
-
+        self.weight_ii = Parameter(torch.randn(hidden_size, hidden_size))
+        self.weight_oo = Parameter(torch.randn(2 * hidden_size, hidden_size))
+        
         self.bias_ih = Parameter(torch.randn(4 * hidden_size))
         self.bias_hh = Parameter(torch.randn(4 * hidden_size))
         self.bias_ii = Parameter(torch.randn(hidden_size))
+        self.bias_oo = Parameter(torch.randn(hidden_size))
 
     @jit.script_method
     def forward(self, input: Tensor, identity: Tensor, state: Tuple[Tensor, Tensor]) -> Tuple[Tensor, Tuple[Tensor, Tensor]]:
@@ -115,13 +117,14 @@ class ConditionedLSTMCellVer2(jit.ScriptModule):
 
         ingate = torch.sigmoid(ingate)
         forgetgate = torch.sigmoid(forgetgate)
+        identgate = torch.tanh(identgate)
         cellgate = torch.tanh(cellgate)
         outgate = torch.sigmoid(outgate)
-        identgate = torch.sigmoid(identgate)
 
         cy = (forgetgate * cx) + (ingate * cellgate)
-        hy = outgate * torch.tanh(cy * identgate)
+        hy_tilde = torch.matmul(torch.cat((cy, identgate), dim=1), self.weight_oo) + self.bias_oo
 
+        hy = outgate * torch.tanh(hy_tilde)
         return hy, (hy, cy)
 
 class LSTMCell(jit.ScriptModule):
@@ -173,34 +176,121 @@ class IdentityAwaredCalibModule(nn.Module):
         self.hidden_dim = int(input_dim/2)
         
         self.device = device
-        self.lstm = ConditionedLSTMLayer(ConditionedLSTMCell, input_size=input_dim, hidden_size=self.hidden_dim)
+        self.lstm = ConditionedLSTMLayer(ConditionedLSTMCellVer2, input_size=input_dim, hidden_size=self.hidden_dim)
         self.calib = nn.Linear(in_features=self.hidden_dim, out_features=ouput_dim)
         
     def forward(self, x, i):
         _, N, _ = x.shape
-        init_state = LSTMState(torch.zeros(N, self.hidden_dim).to(self.device), torch.zeros(N, self.hidden_dim).to(self.device))
+        # init_state = LSTMState(torch.zeros(N, self.hidden_dim).to(self.device), torch.zeros(N, self.hidden_dim).to(self.device))
+        # i = i.unsqueeze(0).contiguous()
+        init_state = LSTMState(i, i)
         x, _ = self.lstm(x, i, init_state)
         x = self.calib(x)
         x = x.permute(1, 0, 2).contiguous()
         return x
     
 class IdentityAwaredCalibModule_v2(nn.Module):
-    def __init__(self, device, input_dim=64, ouput_dim=8) -> None:
+    def __init__(self, device, input_dim=128, ouput_dim=8) -> None:
         super().__init__()
         self.hidden_dim = int(input_dim/2)
         
         self.device = device
         # self.lstm = ConditionedLSTMLayer(ConditionedLSTMCell, input_size=input_dim, hidden_size=self.hidden_dim)
-        self.lstm = nn.LSTM(input_size=input_dim, hidden_size=self.hidden_dim)
+        self.identity_latent = nn.Linear(in_features=input_dim, out_features=self.hidden_dim)
+        self.x_latent = nn.Linear(in_features=input_dim, out_features=self.hidden_dim)
+
+        self.lstm = nn.LSTMCell(input_size=input_dim, hidden_size=self.hidden_dim)
+
+        self.pre_calib = nn.Linear(in_features= 2 * self.hidden_dim, out_features=self.hidden_dim)
         self.calib = nn.Linear(in_features=self.hidden_dim, out_features=ouput_dim)
         
     def forward(self, x, i):
-        _, N, _ = x.shape
-        i = i.unsqueeze(0).contiguous()
-        init_state = LSTMState(i, i)
-        # init_state = LSTMState(torch.zeros(N, self.hidden_dim).to(self.device), torch.zeros(N, self.hidden_dim).to(self.device))
+        N, B, _ = x.shape
+        state = LSTMState(i, i)
+
+        x_ident = self.identity_latent(x)
+        x_latent = self.x_latent(x)
+        x_ident = x_ident.permute(1, 0, 2).contiguous()
+        x_latent = x_latent.permute(1, 0, 2).contiguous()
+
+        ident_coff = torch.bmm(x_ident, i.unsqueeze(2)).squeeze(2)
+        ident_coff = torch.softmax(ident_coff, dim=1)
+        ident_context = torch.bmm(ident_coff.unsqueeze(1), x_ident).squeeze(1)
+
+        x_tilde = []
+        for i in range(N):
+            xi, ci = self.lstm(x[i], state)
+            state = LSTMState(xi, ci)
+
+            x_coff = torch.bmm(x_latent, xi.unsqueeze(2)).squeeze(2)
+            x_coff = torch.softmax(x_coff, dim=1)
+            x_context = torch.bmm(x_coff.unsqueeze(1), x_latent).squeeze(1)
+
+            x_context = torch.cat((ident_context, x_context), dim=1)
+            xi = torch.cat((xi, x_context), dim=1)
+            x_tilde.append(xi)
+        
+        x_tilde = torch.stack(x_tilde)
+        # init_state = LSTMState(torch.zeros(1, N, self.hidden_dim).to(self.device), torch.zeros(1, N, self.hidden_dim).to(self.device))
         # x, _ = self.lstm(x, i, init_state)
-        x, _ = self.lstm(x, init_state)
-        x = self.calib(x)
+
+        x_tilde = torch.tanh(self.pre_calib(x_tilde))
+        x = self.calib(x_tilde)
         x = x.permute(1, 0, 2).contiguous()
         return x
+
+class IdentityAwaredCalibModule_v3(nn.Module):
+    def __init__(self, device, input_dim=128, ouput_dim=8) -> None:
+        super().__init__()
+        self.hidden_dim = int(input_dim/2)
+        
+        self.device = device
+        # self.lstm = ConditionedLSTMLayer(ConditionedLSTMCell, input_size=input_dim, hidden_size=self.hidden_dim)
+        self.identity_latent = nn.Linear(in_features=input_dim, out_features=self.hidden_dim)
+        self.x_latent = nn.Linear(in_features=input_dim, out_features=self.hidden_dim)
+
+        self.lstm = nn.LSTMCell(input_size=input_dim, hidden_size=self.hidden_dim)
+
+        self.pre_calib = nn.Linear(in_features=3 * self.hidden_dim, out_features=self.hidden_dim)
+        self.calib = nn.Linear(in_features=self.hidden_dim, out_features=ouput_dim)
+        
+    def forward(self, x, i):
+        N, B, _ = x.shape
+        state = LSTMState(i, i)
+
+        x_ident = self.identity_latent(x)
+        x_latent = self.x_latent(x)
+        x_ident = x_ident.permute(1, 0, 2).contiguous()
+        x_latent = x_latent.permute(1, 0, 2).contiguous()
+
+        ident_coff = torch.bmm(x_ident, i.unsqueeze(2)).squeeze(2)
+        ident_coff = torch.softmax(ident_coff, dim=1)
+        ident_context = torch.bmm(ident_coff.unsqueeze(1), x_ident).squeeze(1)
+
+        x_tilde = []
+        for i in range(N):
+            xi, ci = self.lstm(x[i], state)
+            state = LSTMState(xi, ci)
+
+            x_coff = torch.bmm(x_latent, xi.unsqueeze(2)).squeeze(2)
+            x_coff = torch.softmax(x_coff, dim=1)
+            x_context = torch.bmm(x_coff.unsqueeze(1), x_latent).squeeze(1)
+
+            x_context = torch.cat((ident_context, x_context), dim=1)
+            xi = torch.cat((xi, x_context), dim=1)
+            x_tilde.append(xi)
+        
+        x_tilde = torch.stack(x_tilde)
+        # init_state = LSTMState(torch.zeros(1, N, self.hidden_dim).to(self.device), torch.zeros(1, N, self.hidden_dim).to(self.device))
+        # x, _ = self.lstm(x, i, init_state)
+
+        x_tilde = self.pre_calib(x_tilde)
+        x = self.calib(x_tilde)
+        x = x.permute(1, 0, 2).contiguous()
+        return x
+
+if __name__ == '__main__':
+    module = IdentityAwaredCalibModule_v3(torch.device('cuda'),input_dim=128, ouput_dim=5)
+    x = torch.randn(7, 128, 128)
+    i = torch.randn(128, 64)
+    print(module(x, i).shape)

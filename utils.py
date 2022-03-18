@@ -315,12 +315,11 @@ def prepare_multicalib_dataset(input_len=CFG.input_timestep, output_len=CFG.outp
     labels_test = labels[int(xs.shape[0] * 0.6):]
     return x_train, y_train, labels_train, x_val, y_val, labels_val, x_test, y_test, labels_test
 
-def prepare_single_dataset(input_len=CFG.input_timestep, output_len=CFG.output_timestep, idex='3', atts=CFG.attributes):
+def prepare_single_dataset(input_len=CFG.input_timestep, output_len=CFG.output_timestep, idex='1', atts=CFG.attributes):
     dts = pd.read_csv('Data/fimi_resample/envitus_fimi_overlapped.csv', header=0)
     
     xs = []
     ys = []
-    labels = []
 
     ids = ['e', idex]
     for idx, id in enumerate(ids):
@@ -333,29 +332,21 @@ def prepare_single_dataset(input_len=CFG.input_timestep, output_len=CFG.output_t
         else:
             for i in range(input_len, dts.shape[0]):
                 x_i = dts[ls_att][i - input_len:i]
-                lab = [0 for _ in range(len(ids) - 1)]
-                lab[idx-1] = 1
                 xs.append(x_i)
-                labels.append(lab)
 
     xs = np.array(xs)
     ys = np.array(ys)
-    labels = np.array(labels)
 
     print(xs.shape)
     print(ys.shape)
-    print(labels.shape)
 
     x_train = xs[:int(xs.shape[0] * 0.5)]
     y_train = ys[:int(xs.shape[0] * 0.5)]
-    labels_train = labels[:int(xs.shape[0] * 0.5)]
     x_val = xs[int(xs.shape[0] * 0.5):int(xs.shape[0] * 0.6)]
     y_val = ys[int(xs.shape[0] * 0.5):int(xs.shape[0] * 0.6)]
-    labels_val = labels[int(xs.shape[0] * 0.5):int(xs.shape[0] * 0.6)]
     x_test = xs[int(xs.shape[0] * 0.6):]
     y_test = ys[int(xs.shape[0] * 0.6):]
-    labels_test = labels[int(xs.shape[0] * 0.6):]
-    return x_train, y_train, labels_train, x_val, y_val, labels_val, x_test, y_test, labels_test
+    return x_train, y_train, x_val, y_val, x_test, y_test
 
 def plot_mulidevice_dataset(ids=CFG.devices, atts=['PM2_5']):
     dts = pd.read_csv('Data/fimi_resample/envitus_fimi_overlapped.csv', header=0)
@@ -401,9 +392,10 @@ if __name__ == '__main__':
     # atts = ['PM2_5_e', 'PM10_e', 'temp_e', 'humidity_e']
 
     # print(dts[atts][:5].values)
-    x_tr, y_tr, lab_tr, _, _, _, x_ts, y_ts, _ = prepare_multicalib_dataset()
+    x_tr, y_tr, _, _, x_ts, y_ts = prepare_single_dataset(input_len=CFG.input_timestep, output_len=CFG.output_timestep, idex='1', atts=CFG.attributes)
     # print(x_tr.shape)
     # print(y_tr.shape)
     # print(lab_tr.shape)
     # plot_mulidevice_dataset()
-    plot_xtrain(x_ts, y_ts)
+    # plot_xtrain(x_ts, y_ts)
+   

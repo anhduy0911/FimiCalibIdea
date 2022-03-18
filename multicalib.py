@@ -135,18 +135,23 @@ class MultiCalibModel:
 
         print(f"MSE_test: {mse:.4f}, MAE_test: {mae:.4f}, MAPE_test: {mape:.4f}")
     
-        ids = ['3', '8', '14', '20', '30']
-        fig, ax = plt.subplots(1, len(ids), figsize=(20, 5))
+        ids = self.args.device_ids[1:]
+        print(ids)
+        atts = self.args.attributes
+        fig, ax = plt.subplots(len(atts), len(ids), figsize=(20, 25))
         for i, idx in enumerate(ids):
-            x_i = self.x_test[:, i, 0, 0]
-            y_i = self.y_test[:, i, 0, 0]
-            pred_i = preds[:, i, 0, 0]
+            for j, att in enumerate(atts):
+                x_i = self.x_test[:, i, 0, j]
+                y_i = self.y_test[:, i, 0, j]
+                pred_i = preds[:, i, 0, j]
 
-            rn_test = range(x_i.shape[0])
-            ax[i].plot(rn_test, x_i, 'g', label='raw')
-            ax[i].plot(rn_test, y_i, 'b', label='gtruth')
-            ax[i].plot(rn_test, pred_i, 'r', label='calibrated')
-            ax[i].legend(loc='best')
-            ax[i].set_title(f"device: {idx}")
-        
+                rn_test = range(x_i.shape[0])
+                ax[j, i].plot(rn_test, x_i, 'g', label='raw')
+                ax[j, i].plot(rn_test, y_i, 'b', label='gtruth')
+                ax[j, i].plot(rn_test, pred_i, 'r', label='calibrated')
+                ax[j, i].legend(loc='best')
+                ax[j, i].set_title(f"device: {idx}")
+                ax[j, i].set_xlabel("time")
+                ax[j, i].set_ylabel(att)
+
         fig.savefig(f"./logs/figures/{self.args.name}_test.png")

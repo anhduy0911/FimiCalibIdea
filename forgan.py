@@ -259,10 +259,10 @@ class ForGAN:
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
     # mg for Mackey Glass and itd = Internet traffic dataset (A5M)
-    ap.add_argument("-ds", metavar='', dest="dataset", type=str, default="lorenz",
-                    help="The name of dataset: lorenz or mg or itd")
-    ap.add_argument("-t", metavar='', dest="cell_type", type=str, default="gru",
-                    help="The type of cells : lstm or gru")
+    ap.add_argument("-ds", metavar='', dest="dataset", type=str, default="fimi",
+                    help="The name of dataset")
+    ap.add_argument("-t", metavar='', dest="cell_type", type=str, default="lstm",
+                    help="The type of RNN cells")
     ap.add_argument("-steps", metavar='', dest="n_steps", type=int, default=10000,
                     help="Number of steps for training")
     ap.add_argument("-bs", metavar='', dest="batch_size", type=int, default=1000,
@@ -293,8 +293,7 @@ if __name__ == '__main__':
                     help="metric to save best model - mae or rmse or kld")
     ap.add_argument("-es", metavar='', dest="early_stop", type=int, default=1000,
                     help="early stopping patience")
-    ap.add_argument("-ssa", metavar='', dest="ssa", type=bool, default=False,
-                    help="use ssa preprocessing")
+                    
     opt = ap.parse_args()
 
     x_train, y_train, x_val, y_val, x_test, y_test = utils.prepare_dataset(opt.condition_size, ssa=opt.ssa)

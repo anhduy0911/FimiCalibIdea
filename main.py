@@ -4,6 +4,7 @@ import utils
 from forgan import ForGAN
 # from multicalib_Nmodel import MultiCalibModel
 from multicalib import MultiCalibModel
+import config as CFG
 
 def seed_everything(seed: int):
     import random, os
@@ -36,7 +37,7 @@ if __name__ == '__main__':
     opt = ap.parse_args()
 
     # x_train, y_train, lab_train, x_val, y_val, lab_val, x_test, y_test, lab_test = utils.prepare_multicalib_dataset()
-    x_train, y_train, lab_train, x_val, y_val, lab_val, x_test, y_test, lab_test = utils.prepare_multicalib_dataset(single=True)
+    x_train, y_train, lab_train, x_val, y_val, lab_val, x_test, y_test, lab_test = utils.prepare_multicalib_dataset(single=False)
    
     x_mean = x_train.mean(axis=0)
     print(x_mean.shape)
@@ -51,6 +52,8 @@ if __name__ == '__main__':
     opt.data_std = x_std
 
     seed_everything(911)
+    opt.device_ids = CFG.devices
+    opt.attributes = CFG.attributes
     model = MultiCalibModel(opt, x_train, y_train, lab_train, x_val, y_val, lab_val, x_test, y_test, lab_test, use_n=opt.use_n)
     # model = SingleCalibModel(opt, x_train, y_train, lab_train, x_val, y_val, lab_val, x_test, y_test, lab_test)
     if opt.train_type == 'train':
