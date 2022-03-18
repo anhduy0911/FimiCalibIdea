@@ -290,8 +290,8 @@ def prepare_multicalib_dataset(input_len=CFG.input_timestep, output_len=CFG.outp
             xs.append(np.array(xis))
             labels.append(labs)
 
-    xs = np.array(xs).transpose(1, 0, 2, 3)
-    ys = np.array(ys)[:, np.newaxis, :, :]
+    xs = np.array(xs, dtype=np.float).transpose(1, 0, 2, 3)
+    ys = np.array(ys, dtype=np.float)[:, np.newaxis, :, :]
     ys = np.repeat(ys, len(ids) - 1, axis=1)
     labels = np.array(labels).transpose(1, 0, 2)
 
@@ -326,7 +326,7 @@ def prepare_single_dataset(input_len=CFG.input_timestep, output_len=CFG.output_t
         ls_att = ['_'.join([a, id]) for a in atts]
         print(ls_att)
         if id == 'e':
-            for i in range(output_len, dts.shape[0]):
+            for i in range(input_len, dts.shape[0]):
                 y_i = dts[ls_att][i - output_len:i]
                 ys.append(y_i)
         else:
@@ -334,8 +334,8 @@ def prepare_single_dataset(input_len=CFG.input_timestep, output_len=CFG.output_t
                 x_i = dts[ls_att][i - input_len:i]
                 xs.append(x_i)
 
-    xs = np.array(xs)
-    ys = np.array(ys)
+    xs = np.array(xs, dtype=np.float)
+    ys = np.array(ys, dtype=np.float)
 
     print(xs.shape)
     print(ys.shape)

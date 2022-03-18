@@ -5,22 +5,26 @@ import numpy as np
 from numpy.lib.type_check import real
 import torch
 import utils
-from components import RGenerator, Generator, Discriminator, AttDiscriminator
+from components import CCGDiscriminator, CCGGenerator
 from torch import nn
 from tqdm import tqdm
 import pandas as pd
+import config as CFG
+
 # Fixing random seeds
 torch.manual_seed(1368)
 rs = np.random.RandomState(1368)
+
+
 YELLOW_TEXT = '\033[93m'
 ENDC = '\033[0m'
 BOLD = '\033[1m'
 
 
-class ForGAN:
+class CalCGAN:
     def __init__(self, opt):
         self.opt = opt
-        self.device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+        self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
         print(f"Use device: {self.device}")
         print("*****  Hyper-parameters  *****")
@@ -33,23 +37,15 @@ class ForGAN:
         os.makedirs("./{}/".format(self.opt.dataset), exist_ok=True)
 
         # Defining GAN components
-        self.generator = RGenerator(noise_size=opt.noise_size,
-                                   condition_size=opt.condition_size,
-                                   generator_latent_size=opt.generator_latent_size,
-                                   cell_type=opt.cell_type,
-                                   mean=opt.data_mean,
-                                   std=opt.data_std)
+        self.generator = CCGGenerator(mean=opt.data_mean, std=opt.data_std)
 
-        self.discriminator = AttDiscriminator(condition_size=opt.condition_size,
-                                           discriminator_latent_size=opt.discriminator_latent_size,
-                                           cell_type=opt.cell_type,
-                                           mean=opt.data_mean,
-                                           std=opt.data_std)
+        self.discriminator = CCGDiscriminator(mean=opt.data_mean, std=opt.data_std)
 
         self.es = utils.EarlyStopping(self.opt.early_stop)
 
         self.generator = self.generator.to(self.device)
         self.discriminator = self.discriminator.to(self.device)
+
         print("\nNetwork Architecture\n")
         print(self.generator)
         print(self.discriminator)
@@ -59,9 +55,11 @@ class ForGAN:
         x_train = torch.tensor(x_train, device=self.device, dtype=torch.float32)
         y_train = torch.tensor(y_train, device=self.device, dtype=torch.float32)
         x_val = torch.tensor(x_val, device=self.device, dtype=torch.float32)
+        
         best_kld = np.inf
         best_rmse = np.inf
         best_mae = np.inf
+        
         optimizer_g = torch.optim.RMSprop(self.generator.parameters(), lr=self.opt.lr)
         optimizer_d = torch.optim.RMSprop(self.discriminator.parameters(), lr=self.opt.lr)
         adversarial_loss = nn.BCELoss()
@@ -79,52 +77,47 @@ class ForGAN:
                 real_data = y_train[idx]
                 self.discriminator.zero_grad()
                 d_real_decision = self.discriminator(real_data, condition)
-                # d_real_loss = adversarial_loss(d_real_decision,
-                #                                torch.full_like(d_real_decision, 1, device=self.device))
-                # d_real_loss.backward()
-                # d_loss += d_real_loss.detach().cpu().numpy()
+                d_real_loss = 1/ 2 * generator_loss(d_real_decision,
+                                               torch.full_like(d_real_decision, 1, device=self.device))
+                d_real_loss.backward()
+                optimizer_d.step()
+
+                d_loss += d_real_loss.detach().cpu().numpy()
                 # train discriminator on fake data
-                noise_batch = torch.tensor(rs.normal(0, 1, (condition.size(0), self.opt.noise_size)),
+                noise_batch = torch.tensor(rs.normal(0, 1, (condition.size(0), CFG.noise_dim)),
                                            device=self.device, dtype=torch.float32)
                 x_fake = self.generator(noise_batch, condition).detach()
                 d_fake_decision = self.discriminator(x_fake, condition)
-                # d_fake_loss = adversarial_loss(d_fake_decision,
-                #                                torch.full_like(d_fake_decision, 0, device=self.device))
-                # d_fake_loss.backward()
-                d_loss_i = -1 * generator_loss(d_real_decision, d_fake_decision)
-                d_loss_i.backward()
+                d_fake_loss = 1/2 * generator_loss(d_fake_decision,
+                                               torch.full_like(d_fake_decision, 0, device=self.device))
+                d_fake_loss.backward()
                 optimizer_d.step()
-                d_loss += d_loss_i.detach().cpu().numpy()
-                # d_loss += d_fake_loss.detach().cpu().numpy()
+                
+                d_loss += d_fake_loss.detach().cpu().numpy()
 
             d_loss = d_loss / (2 * self.opt.d_iter)
 
             self.generator.zero_grad()
-            noise_batch = torch.tensor(rs.normal(0, 1, (self.opt.batch_size, self.opt.noise_size)), device=self.device,
+            noise_batch = torch.tensor(rs.normal(0, 1, (self.opt.batch_size, CFG.noise_dim)), device=self.device,
                                        dtype=torch.float32)
+
             x_fake = self.generator(noise_batch, condition)
             # print(x_fake)
             d_g_decision = self.discriminator(x_fake, condition)
-            d_decision_real = self.discriminator(real_data, condition)
+            
             # Mackey-Glass works best with Minmax loss in our expriements while other dataset
             # produce their best result with non-saturated loss
             # if opt.dataset == "mg" or opt.dataset == 'aqm':
-            #     g_loss = adversarial_loss(d_g_decision, torch.full_like(d_g_decision, 1, device=self.device))
+            g_loss = 1/2 * generator_loss(d_g_decision, torch.full_like(d_g_decision, 1, device=self.device))
             # else:
             #     g_loss = -1 * adversarial_loss(d_g_decision, torch.full_like(d_g_decision, 0, device=self.device))
-            
-            d_decision_real = d_decision_real.detach()
-            g_loss_additional = generator_loss(d_g_decision, d_decision_real)
-            g_loss = generator_loss(x_fake, real_data)
-            g_loss_tot = g_loss_additional * 0.3 + g_loss * 0.7
-            g_loss_additional.backward()
+            g_loss.backward()
             optimizer_g.step()
 
             g_loss = g_loss.detach().cpu().numpy()
-            g_loss_additional = g_loss_additional.detach().cpu().numpy()
 
             # Validation
-            noise_batch = torch.tensor(rs.normal(0, 1, (x_val.size(0), self.opt.noise_size)), device=self.device,
+            noise_batch = torch.tensor(rs.normal(0, 1, (x_val.size(0), CFG.noise_dim)), device=self.device,
                                        dtype=torch.float32)
             preds = self.generator(noise_batch, x_val).detach().cpu().numpy()
 
@@ -142,7 +135,7 @@ class ForGAN:
                                                                 rmse, mae))
                     torch.save({
                         'g_state_dict': self.generator.state_dict()
-                    }, "./{}/best.torch".format(self.opt.dataset))
+                    }, "./{}/{}_best.torch".format(self.opt.dataset, self.opt.name))
             elif self.opt.metric == 'rmse':
                 self.es(rmse)
                 if self.es.early_stop:
@@ -153,7 +146,7 @@ class ForGAN:
                                                                 rmse, mae))
                     torch.save({
                         'g_state_dict': self.generator.state_dict()
-                    }, "./{}/best.torch".format(self.opt.dataset))
+                    }, "./{}/{}_best.torch".format(self.opt.dataset, self.opt.name))
             else:
                 self.es(mae)
                 if self.es.early_stop:
@@ -164,14 +157,14 @@ class ForGAN:
                                                                 rmse, mae))
                     torch.save({
                         'g_state_dict': self.generator.state_dict()
-                    }, "./{}/best.torch".format(self.opt.dataset))
+                    }, "./{}/{}_best.torch".format(self.opt.dataset, self.opt.name))
 
             if step % 100 == 0:
-                print(YELLOW_TEXT + BOLD + "step : {} , d_loss : {} , g_loss : {}, g_loss_mse: {}".format(step, d_loss, g_loss, g_loss_additional) + ENDC)
+                print(YELLOW_TEXT + BOLD + "step : {} , d_loss : {} , g_loss : {}".format(step, d_loss, g_loss) + ENDC)
                 torch.save({
                     'g_state_dict': self.generator.state_dict(), 
                     'd_state_dict': self.discriminator.state_dict(), 
-                }, "./{}/checkpoint.torch".format(self.opt.dataset))
+                }, "./{}/{}_checkpoint.torch".format(self.opt.dataset, self.opt.name))
 
     def test(self, x_test, y_test, load_best=True):
         import os
@@ -180,33 +173,32 @@ class ForGAN:
 
         x_test = torch.tensor(x_test, device=self.device, dtype=torch.float32)
         if os.path.isfile("./{}/best.torch".format(self.opt.dataset)) and load_best:
-            checkpoint = torch.load("./{}/best.torch".format(self.opt.dataset), map_location=self.device)
+            checkpoint = torch.load("./{}/{}_best.torch".format(self.opt.dataset, self.opt.name), map_location=self.device)
         else:
-            checkpoint = torch.load("./{}/checkpoint.torch".format(self.opt.dataset), map_location=self.device)
+            checkpoint = torch.load("./{}/{}_checkpoint.torch".format(self.opt.dataset, self.opt.name), map_location=self.device)
         self.generator.load_state_dict(checkpoint['g_state_dict'])
-        y_test = y_test.flatten()
-        print(y_test.shape)
+        
+        # print(y_test.shape)
         preds = []
         rmses = []
         maes = []
         mapes = []
 
         for _ in range(200):
-            noise_batch = torch.tensor(rs.normal(0, 1, (x_test.size(0), self.opt.noise_size)), device=self.device,
+            noise_batch = torch.tensor(rs.normal(0, 1, (x_test.size(0), CFG.noise_dim)), device=self.device,
                                        dtype=torch.float32)
-            pred = self.generator(noise_batch, x_test).detach().cpu().numpy().flatten()
+            pred = self.generator(noise_batch, x_test).detach().cpu().numpy()
             preds.append(pred)
             error = pred - y_test
             rmses.append(np.sqrt(np.square(error).mean()))
             maes.append(np.abs(error).mean())
-            mapes.append(np.abs(error / y_test).mean() * 100)
+            mapes.append(np.abs(error.mean() / y_test.mean()) * 100)
 
         preds = np.vstack(preds)    
         preds_med = self.divide_bin(preds)
         crps = np.absolute(preds[:100] - y_test).mean() - 0.5 * np.absolute(preds[:100] - preds[100:]).mean()
         preds_mean = np.mean(preds, axis=0)
-        preds = preds.flatten()
-        print(preds_mean.shape) 
+        # print(preds_mean.shape) 
 
         error_med = preds_med - y_test
         rmse_med = np.sqrt(np.square(error_med).mean())
@@ -253,7 +245,7 @@ class ForGAN:
             pred = (bins[most_bin - 1] + bins[most_bin]) / 2
             median_preds.append(pred)
         
-        print(median_preds[:10])
+        # print(median_preds[:10])
         return np.array(median_preds)
 
 if __name__ == '__main__':
@@ -261,8 +253,6 @@ if __name__ == '__main__':
     # mg for Mackey Glass and itd = Internet traffic dataset (A5M)
     ap.add_argument("-ds", metavar='', dest="dataset", type=str, default="fimi",
                     help="The name of dataset")
-    ap.add_argument("-t", metavar='', dest="cell_type", type=str, default="lstm",
-                    help="The type of RNN cells")
     ap.add_argument("-steps", metavar='', dest="n_steps", type=int, default=10000,
                     help="Number of steps for training")
     ap.add_argument("-bs", metavar='', dest="batch_size", type=int, default=1000,
@@ -277,7 +267,7 @@ if __name__ == '__main__':
                     help="The number of cells in generator")
     ap.add_argument("-rd", metavar='', dest="discriminator_latent_size", type=int, default=64,
                     help="The number of cells in discriminator")
-    ap.add_argument("-d_iter", metavar='', dest="d_iter", type=int, default=2,
+    ap.add_argument("-d_iter", metavar='', dest="d_iter", type=int, default=10,
                     help="Number of training iteration for discriminator")
     ap.add_argument("-hbin", metavar='', dest="hist_bins", type=int, default=80,
                     help="Number of histogram bins for calculating KLD")
@@ -293,13 +283,25 @@ if __name__ == '__main__':
                     help="metric to save best model - mae or rmse or kld")
     ap.add_argument("-es", metavar='', dest="early_stop", type=int, default=1000,
                     help="early stopping patience")
-                    
+    ap.add_argument("-name", metavar='', dest="name", type=str, default='calcgan',
+                    help="Name of the model")
+
     opt = ap.parse_args()
 
-    x_train, y_train, x_val, y_val, x_test, y_test = utils.prepare_dataset(opt.condition_size, ssa=opt.ssa)
-    opt.data_mean = x_train.mean()
-    opt.data_std = x_train.std()
-    forgan = ForGAN(opt)
+    x_train, y_train, x_val, y_val, x_test, y_test = utils.prepare_single_dataset()
+    x_mean = x_train.mean(axis=0)
+    x_mean = x_mean.mean(axis=1)
+    # print(x_mean.shape)
+    x_std = x_train.std(axis=0)
+    x_std = x_std.mean(axis=1)
+    print(x_mean.shape)
+    print(x_std.shape)
+
+    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+    opt.data_mean = torch.tensor(x_mean, dtype=torch.float32, device=device)
+    opt.data_std = torch.tensor(x_std, dtype=torch.float32, device=device)
+
+    forgan = CalCGAN(opt)
     if opt.train_type == 'train':
         forgan.train(x_train, y_train, x_val, y_val)
         forgan.test(x_test, y_test, opt.load_best)

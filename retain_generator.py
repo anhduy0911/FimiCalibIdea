@@ -30,7 +30,6 @@ class Generator(nn.Module):
                       out_features=generator_latent_size),
             nn.ReLU(),
             nn.Linear(in_features=generator_latent_size, out_features=1)
-
         )
 
     def forward(self, condition):
