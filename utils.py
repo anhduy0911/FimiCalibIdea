@@ -274,7 +274,7 @@ def prepare_multicalib_dataset(input_len=CFG.input_timestep, output_len=CFG.outp
         ls_att = ['_'.join([a, id]) for a in atts]
         print(ls_att)
         if id == 'e':
-            for i in range(output_len, dts.shape[0]):
+            for i in range(input_len, dts.shape[0]):
                 y_i = dts[ls_att][i - output_len:i]
                 ys.append(y_i)
         else:
