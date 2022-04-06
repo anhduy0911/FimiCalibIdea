@@ -1,6 +1,6 @@
 # input params
-input_dim = 7
-output_dim = 7
+input_dim = 4
+output_dim = 4
 hidden_dim = 64
 n_class = 5
 input_timestep = 7
@@ -10,5 +10,5 @@ batch_size = 128
 lr=1e-3
 epochs=500
 devices=['e', '1', '14', '20', '27', '30']
-attributes=['PM2_5', 'PM10', 'temp', 'humidity', 'CO', 'NO2', 'SO2']
+attributes=['PM2_5', 'PM10', 'temp', 'humidity']
 warm_start_path = 'fimi/best_gen.torch'

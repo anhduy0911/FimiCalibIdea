@@ -1,3 +1,4 @@
 .vscode-upload.json
 wandb/
 logs/
+*/__pycache__/*

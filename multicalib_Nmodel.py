@@ -136,7 +136,7 @@ class MultiCalibModel:
                         loss = criteria(calib_output, y_i)
 
                 if self.use_n:
-                    print(losses)
+                    # print(losses)
                     loss = torch.mean(torch.stack(losses))
                 
                 mse += loss

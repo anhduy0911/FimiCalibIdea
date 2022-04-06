@@ -222,7 +222,7 @@ class Attention(nn.Module):
     def forward(self, decoder_hidden, encoder_outputs):
         if self.method == "dot":
         # For the dot scoring method, no weights or linear layers are involved
-            return encoder_outputs.bmm(decoder_hidden.view(1,-1,1)).squeeze(-1)
+            return encoder_outputs.bmm(decoder_hidden.unsqueeze(2)).squeeze(-1)
         
         elif self.method == "general":
         # For general scoring, decoder hidden state is passed through linear layers to introduce a weight matrix
@@ -231,7 +231,7 @@ class Attention(nn.Module):
         
         elif self.method == "concat":
         # For concat scoring, decoder hidden state and encoder outputs are concatenated first
-            out = torch.tanh(self.fc(decoder_hidden+encoder_outputs))
+            out = torch.tanh(self.fc(decoder_hidden.unsqueeze(1)+encoder_outputs))
             return self.weight(out).squeeze(-1)
 
 class IdentityAwaredCalibModule(nn.Module):
@@ -263,6 +263,7 @@ class IdentityAwaredCalibModule_v2(nn.Module):
         self.identity_latent = nn.Linear(in_features=input_dim, out_features=self.hidden_dim)
         self.x_latent = nn.Linear(in_features=input_dim, out_features=self.hidden_dim)
         
+        self.attention_i = Attention(self.hidden_dim, method='concat')
         self.attention = Attention(self.hidden_dim, method='concat')
         self.lstm = nn.LSTMCell(input_size=input_dim, hidden_size=self.hidden_dim)
 
@@ -278,30 +279,32 @@ class IdentityAwaredCalibModule_v2(nn.Module):
         x_ident = x_ident.permute(1, 0, 2).contiguous()
         x_latent = x_latent.permute(1, 0, 2).contiguous()
 
-        # print(x_ident.shape)
-        # print(i.shape)
-        ident_coff = self.attention(x_ident, i.unsqueeze(1))
+        ident_coff = self.attention_i(i, x_ident)
         ident_coff = torch.softmax(ident_coff, dim=1)
         ident_context = torch.bmm(ident_coff.unsqueeze(1), x_ident).squeeze(1)
 
         x_tilde = []
+        x_inp = x[-1]
         for i in range(CFG.output_timestep):
-            xi, ci = self.lstm(x[i], state)
+            xi, ci = self.lstm(x_inp, state)
             state = LSTMState(xi, ci)
 
-            x_coff = self.attention(x_latent, xi.unsqueeze(1))
+            x_coff = self.attention(xi, x_latent)
             x_coff = torch.softmax(x_coff, dim=1)
             x_context = torch.bmm(x_coff.unsqueeze(1), x_latent).squeeze(1)
 
-            x_context = torch.cat((ident_context, x_context), dim=1)
-            xi = torch.cat((xi, x_context), dim=1)
+            x_context2 = torch.cat((ident_context, x_context), dim=1)
+            xi = torch.cat((xi, x_context2), dim=1)
+            xi = torch.tanh(self.pre_calib(xi))
+
+            x_inp = torch.cat((xi, x_context), dim=1)
             x_tilde.append(xi)
         
         x_tilde = torch.stack(x_tilde)
         # init_state = LSTMState(torch.zeros(1, N, self.hidden_dim).to(self.device), torch.zeros(1, N, self.hidden_dim).to(self.device))
         # x, _ = self.lstm(x, i, init_state)
 
-        x_tilde = torch.tanh(self.pre_calib(x_tilde))
+        # x_tilde = torch.tanh(self.pre_calib(x_tilde))
         x = self.calib(x_tilde)
         x = x.permute(1, 0, 2).contiguous()
         return x
