@@ -202,6 +202,37 @@ class ConditionedLSTMLayer(jit.ScriptModule):
             outputs += [out]
         return torch.stack(outputs), state
 
+class Attention(nn.Module):
+    def __init__(self, hidden_size, method="dot"):
+        '''
+        Module return the alignment scores
+        '''
+        super(Attention, self).__init__()
+        self.method = method
+        self.hidden_size = hidden_size
+        
+        # Defining the layers/weights required depending on alignment scoring method
+        if method == "general":
+            self.fc = nn.Linear(hidden_size, hidden_size, bias=False)
+        
+        elif method == "concat":
+            self.fc = nn.Linear(hidden_size, hidden_size, bias=False)
+            self.weight = nn.Linear(hidden_size, 1, bias=False)
+  
+    def forward(self, decoder_hidden, encoder_outputs):
+        if self.method == "dot":
+        # For the dot scoring method, no weights or linear layers are involved
+            return encoder_outputs.bmm(decoder_hidden.view(1,-1,1)).squeeze(-1)
+        
+        elif self.method == "general":
+        # For general scoring, decoder hidden state is passed through linear layers to introduce a weight matrix
+            out = self.fc(decoder_hidden)
+            return encoder_outputs.bmm(out.view(1,-1,1)).squeeze(-1)
+        
+        elif self.method == "concat":
+        # For concat scoring, decoder hidden state and encoder outputs are concatenated first
+            out = torch.tanh(self.fc(decoder_hidden+encoder_outputs))
+            return self.weight(out).squeeze(-1)
 
 class IdentityAwaredCalibModule(nn.Module):
     def __init__(self, device, input_dim=64, ouput_dim=8) -> None:
@@ -304,7 +335,7 @@ class IdentityAwaredCalibModule_v3(nn.Module):
         ident_context = torch.bmm(ident_coff.unsqueeze(1), x_ident).squeeze(1)
 
         x_tilde = []
-        for i in range(N):
+        for i in range(CFG.output_timestep):
             xi, ci = self.lstm(x[i], state)
             state = LSTMState(xi, ci)
 
@@ -326,7 +357,7 @@ class IdentityAwaredCalibModule_v3(nn.Module):
         return x
 
 if __name__ == '__main__':
-    module = IdentityAwaredCalibModule_v3(torch.device('cuda'),input_dim=128, ouput_dim=5)
+    module = IdentityAwaredCalibModule_v2(torch.device('cuda'),input_dim=128, ouput_dim=5)
     x = torch.randn(7, 128, 128)
     i = torch.randn(128, 64)
     print(module(x, i).shape)
