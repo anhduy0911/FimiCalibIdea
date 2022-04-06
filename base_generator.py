@@ -144,7 +144,9 @@ class CalCGenerator:
                     print("step : {} , RMSE : {}, MAE: {}".format(step,
                                                                 rmse, mae))
                     torch.save({
-                        'g_state_dict': self.generator.state_dict()
+                        'g_state_dict': self.generator.state_dict(),
+                        'cond_to_latent': self.generator.cond_to_latent.state_dict(),
+                        'ctx_2_cal': self.generator.ctx_2_cal.state_dict(),
                     }, "./{}/best_gen.torch".format(self.opt.dataset))
 
             if step % 100 == 0:

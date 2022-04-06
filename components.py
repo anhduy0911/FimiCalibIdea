@@ -80,6 +80,14 @@ class CCGGenerator(nn.Module):
             nn.Linear(in_features=self.generator_latent_size * 2, out_features=self.condition_size)
         ) 
 
+    def get_warm_start(self, path=CFG.warm_start_path):
+        dict = torch.load(path)
+        
+        self.cond_to_latent.load_state_dict(dict['cond_to_latent'])
+        self.ctx_2_cal.load_state_dict(dict['ctx_2_cal'])
+        
+        self.cond_to_latent.requires_grad_(False)
+            
     def forward(self, noise, condition):
         condition = (condition - self.mean) / self.std
 
@@ -106,7 +114,7 @@ class CCGGenerator(nn.Module):
         return output
 
 class CCGDiscriminator(nn.Module):
-    def __init__(self, condition_size=CFG.input_dim, discriminator_latent_size=CFG.hidden_dim * 2, mean=0, std=1):
+    def __init__(self, condition_size=CFG.input_dim, discriminator_latent_size=CFG.hidden_dim, output_timestep=CFG.output_timestep, input_timestep=CFG.input_timestep, mean=0, std=1):
         super().__init__()
         self.condition_size = condition_size
         self.discriminator_latent_size = discriminator_latent_size
@@ -119,15 +127,27 @@ class CCGDiscriminator(nn.Module):
                                         bidirectional=True, 
                                         batch_first=True,
                                         num_layers=1)
-
+        
+        # self.pred_to_latent = nn.LSTM(input_size=self.condition_size,
+        #                                 hidden_size=discriminator_latent_size, 
+        #                                 bidirectional=True, 
+        #                                 batch_first=True,
+        #                                 num_layers=1)
+        
         self.model = nn.Sequential(
             nn.LeakyReLU(),
             nn.Linear(in_features=discriminator_latent_size * 2, out_features=discriminator_latent_size),
             nn.LeakyReLU(),
-            nn.Linear(in_features=discriminator_latent_size, out_features=self.half_discriminator_latent_size),
-            nn.LeakyReLU(),
-            nn.Linear(in_features=self.half_discriminator_latent_size, out_features=1)
+            # nn.Linear(in_features=discriminator_latent_size, out_features=self.half_discriminator_latent_size),
+            # nn.LeakyReLU(),
+            nn.Linear(in_features=discriminator_latent_size, out_features=1),
+            nn.Sigmoid()
         )
+        # self.model = nn.Sequential(
+        #     # nn.LeakyReLU(),
+        #     nn.Linear(in_features=input_timestep * output_timestep, out_features=1),
+        #     nn.Sigmoid()
+        # )
 
     def forward(self, prediction, condition):
         condition = (condition - self.mean) / self.std
@@ -136,11 +156,20 @@ class CCGDiscriminator(nn.Module):
         _, N, _ = prediction.shape
         d_input = torch.cat((condition[:,:-N], prediction), dim=1)
         # print(d_input.shape)
-        hy, _ = self.input_to_latent(d_input)
+        h_input, _ = self.input_to_latent(d_input)
+        # h_pred, _ = self.pred_to_latent(prediction)
+        
+        # coeff = torch.bmm(h_input, h_pred.transpose(1,2))
+        # coeff = coeff.flatten(start_dim=1).contiguous()
+        # print(f'coeff: {coeff.shape}')
+        # h_input, _ = self.input_to_latent(condition)
         # print(hy.shape)
-        d_latent = hy[:,-1,:]
-
-        output = self.model(d_latent)
+        input_latent = h_input[:,-1,:]
+        # pred_latent = h_pred[:,-1,:]
+        # d_latent = torch.cat((input_latent, pred_latent), dim=1)
+        # print(d_latent.shape)
+        output = self.model(input_latent)
+        
         return output
 
 class AttDiscriminator(nn.Module):
@@ -269,6 +298,7 @@ class Discriminator(nn.Module):
 
 if __name__ == '__main__':
     gen = CCGGenerator()
+    gen.get_warm_start()
     dis = CCGDiscriminator()
     print(gen)
     print(dis)

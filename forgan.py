@@ -38,6 +38,7 @@ class CalCGAN:
 
         # Defining GAN components
         self.generator = CCGGenerator(mean=opt.data_mean, std=opt.data_std)
+        self.generator.get_warm_start()
 
         self.discriminator = CCGDiscriminator(mean=opt.data_mean, std=opt.data_std)
 
@@ -77,7 +78,7 @@ class CalCGAN:
                 real_data = y_train[idx]
                 self.discriminator.zero_grad()
                 d_real_decision = self.discriminator(real_data, condition)
-                d_real_loss = 1/ 2 * generator_loss(d_real_decision,
+                d_real_loss = 1/ 2 * adversarial_loss(d_real_decision,
                                                torch.full_like(d_real_decision, 1, device=self.device))
                 d_real_loss.backward()
                 optimizer_d.step()
@@ -88,7 +89,7 @@ class CalCGAN:
                                            device=self.device, dtype=torch.float32)
                 x_fake = self.generator(noise_batch, condition).detach()
                 d_fake_decision = self.discriminator(x_fake, condition)
-                d_fake_loss = 1/2 * generator_loss(d_fake_decision,
+                d_fake_loss = 1/2 * adversarial_loss(d_fake_decision,
                                                torch.full_like(d_fake_decision, 0, device=self.device))
                 d_fake_loss.backward()
                 optimizer_d.step()
@@ -108,7 +109,7 @@ class CalCGAN:
             # Mackey-Glass works best with Minmax loss in our expriements while other dataset
             # produce their best result with non-saturated loss
             # if opt.dataset == "mg" or opt.dataset == 'aqm':
-            g_loss = 1/2 * generator_loss(d_g_decision, torch.full_like(d_g_decision, 1, device=self.device))
+            g_loss = 1/2 * adversarial_loss(d_g_decision, torch.full_like(d_g_decision, 1, device=self.device))
             # else:
             #     g_loss = -1 * adversarial_loss(d_g_decision, torch.full_like(d_g_decision, 0, device=self.device))
             g_loss.backward()
@@ -194,35 +195,37 @@ class CalCGAN:
             maes.append(np.abs(error).mean())
             mapes.append(np.abs(error.mean() / y_test.mean()) * 100)
 
-        preds = np.vstack(preds)    
-        preds_med = self.divide_bin(preds)
-        crps = np.absolute(preds[:100] - y_test).mean() - 0.5 * np.absolute(preds[:100] - preds[100:]).mean()
+        preds = np.stack(preds, axis=0)   
+        print(preds.shape) 
+        # preds_med = self.divide_bin(preds)
+        preds_med = np.median(preds, axis=0)
+        crps = np.absolute(np.median(preds[:100], axis=0) - y_test).mean() - 0.5 * np.absolute(np.median(preds[:100], axis=0) - np.median(preds[100:], axis=0)).mean()
         preds_mean = np.mean(preds, axis=0)
         # print(preds_mean.shape) 
 
         error_med = preds_med - y_test
         rmse_med = np.sqrt(np.square(error_med).mean())
         mae_med = np.abs(error_med).mean()
-        mape_med = np.abs(error_med / y_test).mean() * 100
+        mape_med = np.abs(error_med.mean() / y_test.mean()) * 100
 
         fig, (ax1, ax2) = plt.subplots(1, 2)
         fig.set_figheight(8)
         fig.set_figwidth(22)
         fig.suptitle('PM2.5')
 
-        ax1.plot(y_test, label='Real')
+        ax1.plot(y_test[:,0,0], label='Real')
         ax1.plot(before_calib, label='Raw')
         ax1.set_title("Before calibration")
         ax1.legend()
 
-        ax2.plot(y_test, label='Real')
-        ax2.plot(preds_mean, label='Prediction')
+        ax2.plot(y_test[:,0,0], label='Real')
+        ax2.plot(preds_mean[:,0,0], label='Prediction')
         ax2.set_title("After calibration")
         ax2.legend()
         fig.savefig('img/forgan.png')
 
         kld = utils.calc_kld(preds, y_test, self.opt.hist_bins, self.opt.hist_min, self.opt.hist_max)
-        print("Test resuts:\nRMSE : {}({})\nMAE : {}({})\nMAPE : {}({}) %\nCRPS : {}\nKLD : {}\nTest resuts med:\nRMSE : {}\nMAE : {}\nMAPE : {} %"
+        print("Test results:\nRMSE : {}({})\nMAE : {}({})\nMAPE : {}({}) %\nCRPS : {}\nKLD : {}\nTest resuts med:\nRMSE : {}\nMAE : {}\nMAPE : {} %"
               .format(np.mean(rmses), np.std(rmses),
                       np.mean(maes), np.std(maes),
                       np.mean(mapes), np.std(mapes),
@@ -267,7 +270,7 @@ if __name__ == '__main__':
                     help="The number of cells in generator")
     ap.add_argument("-rd", metavar='', dest="discriminator_latent_size", type=int, default=64,
                     help="The number of cells in discriminator")
-    ap.add_argument("-d_iter", metavar='', dest="d_iter", type=int, default=10,
+    ap.add_argument("-d_iter", metavar='', dest="d_iter", type=int, default=5,
                     help="Number of training iteration for discriminator")
     ap.add_argument("-hbin", metavar='', dest="hist_bins", type=int, default=80,
                     help="Number of histogram bins for calculating KLD")
