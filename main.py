@@ -3,7 +3,8 @@ from single_calib import SingleCalibModel
 import utils
 # from forgan import ForGAN
 # from multicalib_Nmodel import MultiCalibModel
-from multicalib import MultiCalibModel
+# from multicalib import MultiCalibModel
+from multicalib_v1 import MultiCalibModel
 import config as CFG
 
 def seed_everything(seed: int):

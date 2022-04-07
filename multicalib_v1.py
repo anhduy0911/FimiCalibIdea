@@ -2,12 +2,13 @@ import numpy as np
 import torch
 import torch.nn as nn
 from utils import EarlyStopping, MetricLogger
+from util.losses import ConstrastiveLoss
 from models.MulCal import MulCal
 from Data.calib_loader import CalibDataset
 import config as CFG
 import matplotlib.pyplot as plt
 class MultiCalibModel:
-    def __init__(self, args, x_train, y_train, lab_train, x_val, y_val, lab_val, x_test, y_test, lab_test, devices=CFG.devices):
+    def __init__(self, args, x_train, y_train, lab_train, x_val, y_val, lab_val, x_test, y_test, lab_test, devices=CFG.devices, use_n=False):
         self.args = args
         self.train_loader = torch.utils.data.DataLoader(CalibDataset(x_train, y_train, lab_train), batch_size=CFG.batch_size, shuffle=True)
         self.val_loader = torch.utils.data.DataLoader(CalibDataset(x_val, y_val, lab_val), batch_size=CFG.batch_size, shuffle=True)
@@ -16,7 +17,7 @@ class MultiCalibModel:
         self.x_test = x_test
         self.y_test = y_test
 
-        self.device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+        self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         self.es = EarlyStopping(self.args.early_stop)
 
         print(f"Use device: {self.device}")
@@ -36,16 +37,16 @@ class MultiCalibModel:
 
         optimizer = torch.optim.AdamW(self.model.parameters(), lr=CFG.lr)
         criteria = nn.MSELoss()
-        criteria_lab = nn.CrossEntropyLoss()
         criteria = criteria.to(self.device)
-        criteria_lab = criteria_lab.to(self.device)
+
+        criteria_cons = ConstrastiveLoss()
 
         log_dict = {}
         logger = MetricLogger(self.args, tags=['train', 'val'])
         
         for epoch in range(CFG.epochs):
             self.model.train()
-            mse_train, mae_train, ce_train = 0, 0, 0
+            mse_train, mae_train, mape_train = 0, 0, 0
             cnt = 0
             for x, y, lab in self.train_loader:
                 cnt += 1
@@ -54,11 +55,13 @@ class MultiCalibModel:
                 lab = lab.to(self.device)
                 self.model.zero_grad()
 
-                ident, pred = self.model(x)
+                pred, idents = self.model(x)
                 # print(pred.shape)
                 # print(y.shape)
                 loss = criteria(pred, y)
-                loss_lab = criteria_lab(ident, lab)
+                
+                loss_cons = criteria_cons(idents)
+                loss_cons.backward(retain_graph=True)
 
                 mae = torch.mean(torch.abs(pred - y))
                 # mape = torch.mean(torch.abs((pred - y) / y)) * 100
@@ -66,61 +69,55 @@ class MultiCalibModel:
 
                 mse_train += loss
                 mae_train += mae
-                ce_train += loss_lab
                 # mape_train += mape
-                loss.backward(retain_graph=True)
-                loss_lab.backward()
+                loss.backward()
                 optimizer.step()
             
             mse_train /= cnt
             mae_train /= cnt
-            ce_train /= cnt
             # mape_train /= cnt
 
             log_dict['train/mse'] = mse_train
             log_dict['train/mae'] = mae_train
-            log_dict['train/cross_entropy'] = ce_train
             # log_dict['train/mape'] = mape_train
             # validation
             self.model.eval()
-            mse, mae, ce = 0, 0, 0
+            mse, mae, mape = 0, 0, 0
             cnt = 0
             for x, y, lab in self.val_loader:
                 cnt += 1
                 x = x.to(self.device)
                 y = y.to(self.device)
                 lab = lab.to(self.device)
-                ident, pred = self.model(x)
+                pred, _ = self.model(x)
 
                 mse += criteria(pred, y)
                 mae += torch.abs(pred - y).mean()
-                ce += criteria_lab(ident, lab)
                 # mape += torch.mean(torch.abs((pred - y) / y)) * 100
             mse /= cnt
             mae /= cnt
-            ce /= cnt
             # mape /= cnt
 
             log_dict['val/mse'] = mse
             log_dict['val/mae'] = mae
-            log_dict['val/cross_entropy'] = ce
             # log_dict['val/mape'] = mape
             logger.log_metrics(epoch, log_dict)
             # print(log_dict)
-            print(f"Epoch: {epoch+1:3d}/{CFG.epochs:3d}, MSE_val: {mse:.4f}, MAE_val: {mae:.4f}, CE_val: {ce:.4f}")
+            print(f"Epoch: {epoch+1:3d}/{CFG.epochs:3d}, MSE_val: {mse:.4f}, MAE_val: {mae:.4f}")
             self.es(mse)
 
             if mse < best_mse:
                 best_mse = mse
-                torch.save(self.model.state_dict(), "./logs/checkpoints/best_model_multi.pt")
+                torch.save(self.model.state_dict(), f"./logs/checkpoints/{self.args.name}_best.pt")
             else: 
-                torch.save(self.model.state_dict(), "./logs/checkpoints/last_model_multi.pt")
+                torch.save(self.model.state_dict(), f"./logs/checkpoints/{self.args.name}_last.pt")
+                # self.model.load_state_dict(torch.load(f"./logs/checkpoints/{self.args.name}_best.pt"))
                 if (self.es.early_stop):
                     print("Early stopping")
                     break
     
     def test(self):
-        self.model.load_state_dict(torch.load("./logs/checkpoints/best_model_multi.pt"))
+        self.model.load_state_dict(torch.load(f"./logs/checkpoints/{self.args.name}_best.pt"))
         
         self.model.eval()
         mse, mae, mape = 0, 0, 0
@@ -131,7 +128,7 @@ class MultiCalibModel:
             x = x.to(self.device)
             y = y.to(self.device)
             lab = lab.to(self.device)
-            _, pred = self.model(x)
+            pred, _ = self.model(x)
 
             preds.append(pred.cpu().detach().numpy())
             mse += torch.mean((pred - y) ** 2)
@@ -145,18 +142,23 @@ class MultiCalibModel:
 
         print(f"MSE_test: {mse:.4f}, MAE_test: {mae:.4f}, MAPE_test: {mape:.4f}")
     
-        ids = ['3', '8', '14', '20', '30']
-        fig, ax = plt.subplots(1, len(ids), figsize=(20, 5))
+        ids = self.args.device_ids[1:]
+        print(ids)
+        atts = self.args.attributes
+        fig, ax = plt.subplots(len(atts), len(ids), figsize=(20, 25))
         for i, idx in enumerate(ids):
-            x_i = self.x_test[:, i, 0, 0]
-            y_i = self.y_test[:, i, 0, 0]
-            pred_i = preds[:, i, 0, 0]
+            for j, att in enumerate(atts):
+                x_i = self.x_test[:, i, 0, j]
+                y_i = self.y_test[:, i, 0, j]
+                pred_i = preds[:, i, 0, j]
 
-            rn_test = range(x_i.shape[0])
-            ax[i].plot(rn_test, x_i, 'g', label='raw')
-            ax[i].plot(rn_test, y_i, 'b', label='gtruth')
-            ax[i].plot(rn_test, pred_i, 'r', label='calibrated')
-            ax[i].legend(loc='best')
-            ax[i].set_title(f"device: {idx}")
-        
-        fig.savefig("./logs/figures/multi_test.png")
+                rn_test = range(x_i.shape[0])
+                ax[j, i].plot(rn_test, x_i, 'g', label='raw')
+                ax[j, i].plot(rn_test, y_i, 'b', label='gtruth')
+                ax[j, i].plot(rn_test, pred_i, 'r', label='calibrated')
+                ax[j, i].legend(loc='best')
+                ax[j, i].set_title(f"device: {idx}")
+                ax[j, i].set_xlabel("time")
+                ax[j, i].set_ylabel(att)
+
+        fig.savefig(f"./logs/figures/{self.args.name}_test.png")

@@ -10,10 +10,11 @@ import config as CFG
 
 LSTMState = namedtuple('LSTMState', ['hx', 'cx'])
 class SeriesEncoder(nn.Module):
-    def __init__(self, input_dim=8, output_dim=32) -> None:
+    def __init__(self, input_dim=8, output_dim=32, last_only=False) -> None:
         super(SeriesEncoder, self).__init__()
         # self.cnn_1 = nn.Conv1d(in_channels=input_dim, out_channels=32, kernel_size=3, stride=1, padding=1)
         # self.relu = nn.ReLU()
+        self.last_only = last_only
         self.lstm = nn.LSTM(input_size=input_dim, hidden_size=64, num_layers=1, batch_first=False)
         self.bilstm = nn.LSTM(input_size=64, hidden_size=output_dim, num_layers=1, batch_first=False, bidirectional=True)
         
@@ -23,9 +24,12 @@ class SeriesEncoder(nn.Module):
         # x = self.relu(x)
         x = x.permute(1, 0, 2).contiguous()
         x, _ = self.lstm(x)
-        x, _ = self.bilstm(x)
-        return x
-
+        x, (hx, cx) = self.bilstm(x)
+        
+        if not self.last_only:
+            return x
+        else:
+            return hx[0]
 
 class IdentityLayer(nn.Module):
     def __init__(self, input_dim=64, hidden_dim=32, nclass=5) -> None:
