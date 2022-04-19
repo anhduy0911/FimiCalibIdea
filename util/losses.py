@@ -1,7 +1,9 @@
 import torch
 
 class ConstrastiveLoss():
-    
+    def __init__(self, temperature=1):
+        self.temperature = temperature
+        
     def __call__(self, flt_inps, eps=1e-6):
         B, N, H = flt_inps.shape
         
@@ -17,7 +19,7 @@ class ConstrastiveLoss():
         cosine_inp = 1/2 * (cosine_inp + 1)
         cosine_inp -= torch.eye(N, dtype=torch.float32).to(flt_negs.device)
         similarity_negative = torch.sum(cosine_inp, dim=1) / (N - 1)
-        
+        inverse_similarity_negative = 1 - similarity_negative
         # print(similarity_negative)
         # print('______')
 
@@ -39,7 +41,8 @@ class ConstrastiveLoss():
         similarity_positives = torch.stack(similarity_positives, dim=0)
         # print(similarity_positives)
 
-        losses = - torch.log(torch.exp(similarity_negative) / (torch.exp(similarity_negative) + torch.exp(similarity_positives)))
+        # losses = - torch.log(torch.exp(similarity_positives / self.temperature) / (torch.exp(similarity_negative / self.temperature) + torch.exp(similarity_positives / self.temperature)))
+        losses = similarity_positives * torch.log(similarity_positives / inverse_similarity_negative)
         # print(losses)
 
         return torch.mean(losses)
@@ -56,7 +59,11 @@ if __name__ == '__main__':
     start = time.time()
     print(loss(inp))
     print(time.time() - start)
-    start = time.time()
-    print(loss2(inp, inp2))
-    print(time.time() - start)
+    # start = time.time()
+    # print(loss2(inp, inp2))
+    # print(time.time() - start)
+    
+    for i in range(100):
+        inp = torch.randn(128, 5, 64)
+        assert(loss(inp) > 0)
     

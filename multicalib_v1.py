@@ -55,7 +55,7 @@ class MultiCalibModel:
                 lab = lab.to(self.device)
                 self.model.zero_grad()
 
-                pred, idents = self.model(x)
+                pred, idents = self.model(x, lab)
                 # print(pred.shape)
                 # print(y.shape)
                 loss = criteria(pred, y)
@@ -89,7 +89,7 @@ class MultiCalibModel:
                 x = x.to(self.device)
                 y = y.to(self.device)
                 lab = lab.to(self.device)
-                pred, _ = self.model(x)
+                pred, _ = self.model(x, lab)
 
                 mse += criteria(pred, y)
                 mae += torch.abs(pred - y).mean()
@@ -128,7 +128,7 @@ class MultiCalibModel:
             x = x.to(self.device)
             y = y.to(self.device)
             lab = lab.to(self.device)
-            pred, _ = self.model(x)
+            pred, _ = self.model(x, lab)
 
             preds.append(pred.cpu().detach().numpy())
             mse += torch.mean((pred - y) ** 2)

@@ -23,17 +23,17 @@ def seed_everything(seed: int):
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
     # mg for Mackey Glass and itd = Internet traffic dataset (A5M)
-    ap.add_argument("-metric", metavar='', dest="metric", type=str, default='mse',
+    ap.add_argument("--metric", metavar='', dest="metric", type=str, default='mse',
                     help="metric to save best model - mae or rmse or kld")
-    ap.add_argument("-es", metavar='', dest="early_stop", type=int, default=50,
+    ap.add_argument("--es", metavar='', dest="early_stop", type=int, default=50,
                     help="early stopping patience")
-    ap.add_argument("-ssa", metavar='', dest="ssa", type=bool, default=False,
+    ap.add_argument("--ssa", metavar='', dest="ssa", type=bool, default=False,
                     help="use ssa preprocessing")
-    ap.add_argument("-type", metavar='', dest="train_type", type=str, default='train',
+    ap.add_argument("--type", metavar='', dest="train_type", type=str, default='train',
                     help="train")
-    ap.add_argument("-name", metavar='', dest="name", type=str, default='multi',
+    ap.add_argument("--name", metavar='', dest="name", type=str, default='multi',
                     help="name of the model - project")
-    ap.add_argument("-usen", metavar='', dest="use_n", type=bool, default=False,
+    ap.add_argument("--usen", metavar='', dest="use_n", type=bool, default=False,
                     help="whether to use n model or only one")
     opt = ap.parse_args()
 

@@ -14,10 +14,11 @@ class MulCal(nn.Module):
         self.n_class = n_class
 
         self.extractor = SeriesEncoder(input_dim, hidden_dim)
-        self.identity = SeriesEncoder(input_dim, hidden_dim, last_only=True)
+        # self.identity = SeriesEncoder(input_dim, hidden_dim, last_only=True)
+        self.identity = IdentityLayer_v2(hidden_dim * 2, hidden_dim, n_class)
         self.calib = IdentityAwaredCalibModule_v2(device, hidden_dim * 2, output_dim)
 
-    def forward(self, input):
+    def forward(self, input, label):
         '''
         input with shape (N, M, L, H), in which:
             N - batch size
@@ -32,11 +33,12 @@ class MulCal(nn.Module):
         identity_latent_inputs = []
         for i in range(M):
             input_i = input[:, i, :, :]
+            label_i = label[:, i, :]
 
             input_i = (input_i - self.data_mean[i]) / self.data_std[i]
             latent_input_i = self.extractor(input_i)
             
-            identity_latent_input_i = self.identity(input_i)
+            identity_latent_input_i = self.identity(label_i)
             identity_latent_inputs.append(identity_latent_input_i)
             # Calibration
             # latent_input_i = latent_input_i.permute(1, 0, 2).contiguous()
