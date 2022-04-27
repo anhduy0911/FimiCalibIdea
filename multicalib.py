@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from utils import EarlyStopping, MetricLogger
+from util.losses import ConstrastiveLoss
 from models.MulCal_v2 import MulCal
 from Data.calib_loader import CalibDataset
 import config as CFG
@@ -37,6 +38,7 @@ class MultiCalibModel:
         optimizer = torch.optim.AdamW(self.model.parameters(), lr=CFG.lr)
         criteria = nn.MSELoss()
         criteria = criteria.to(self.device)
+        criteria_cons = ConstrastiveLoss()  
 
         log_dict = {}
         logger = MetricLogger(self.args, tags=['train', 'val'])
@@ -52,10 +54,13 @@ class MultiCalibModel:
                 lab = lab.to(self.device)
                 self.model.zero_grad()
 
-                pred = self.model(x, lab)
+                pred, sep_indicator = self.model(x, lab)
                 # print(pred.shape)
                 # print(y.shape)
                 loss = criteria(pred, y)
+                loss_cons = criteria_cons(sep_indicator)
+                loss_cons.backward(retain_graph=True)
+
                 mae = torch.mean(torch.abs(pred - y))
                 # mape = torch.mean(torch.abs((pred - y) / y)) * 100
                 # print(mape)
@@ -82,7 +87,7 @@ class MultiCalibModel:
                 x = x.to(self.device)
                 y = y.to(self.device)
                 lab = lab.to(self.device)
-                pred = self.model(x, lab)
+                pred, _ = self.model(x, lab)
 
                 mse += criteria(pred, y)
                 mae += torch.abs(pred - y).mean()
@@ -121,7 +126,7 @@ class MultiCalibModel:
             x = x.to(self.device)
             y = y.to(self.device)
             lab = lab.to(self.device)
-            pred = self.model(x, lab)
+            pred, _ = self.model(x, lab)
 
             preds.append(pred.cpu().detach().numpy())
             mse += torch.mean((pred - y) ** 2)

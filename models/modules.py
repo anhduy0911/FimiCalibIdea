@@ -112,7 +112,7 @@ class IdentityMergingModule(nn.Module):
         # print(attention_heads.shape)
         attention_vecs = torch.mean(attention_heads, dim=2).contiguous()
         # print(attention_vecs.shape)
-        return attention_vecs.view(N,M,L,-1).contiguous()
+        return attention_vecs.view(N,M,L,-1).contiguous(), n_keys
         
 class Attention(nn.Module):
     def __init__(self, hidden_size, method="dot"):

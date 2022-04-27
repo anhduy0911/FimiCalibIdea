@@ -46,7 +46,7 @@ class MulCal(nn.Module):
         identity_latent = torch.stack(identity_latents, dim=1)
         # print(identity_latent.shape)
 
-        merged_inputs = self.seperate_module(latent_input, identity_latent)
+        merged_inputs, sep_indicator = self.seperate_module(latent_input, identity_latent)
         # print(merged_inputs.shape)
         calib_outs = []
         for i in range(M):
@@ -61,7 +61,7 @@ class MulCal(nn.Module):
 
         calib_outs = torch.stack(calib_outs, dim=1)
 
-        return calib_outs
+        return calib_outs, sep_indicator
 
 
 if __name__ == '__main__':
