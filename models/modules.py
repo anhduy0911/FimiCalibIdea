@@ -61,6 +61,59 @@ class IdentityLayer_v2(nn.Module):
         i_ebd = self.module(x)
         return i_ebd
 
+class IdentityMergingModule(nn.Module):
+    def __init__(self, n_devices=5, query_dim=64, key_dim=64, n_heads=1):
+        super(IdentityMergingModule, self).__init__()
+        self.query_dim = query_dim
+        self.key_dim = key_dim
+        self.n_heads = n_heads
+        self.n_devices = n_devices
+
+        if query_dim != key_dim:
+            self.query_tfm = nn.Linear(in_features=query_dim, out_features=key_dim)
+        self.context_lstm = nn.LSTM(input_size=key_dim * n_devices, hidden_size=key_dim * n_devices, num_layers=1, batch_first=True)
+        self.score_module = nn.Sequential(
+            nn.Linear(in_features=key_dim, out_features=key_dim * n_heads),
+            nn.LeakyReLU(0.02),
+            nn.Linear(in_features=key_dim * n_heads, out_features= n_devices * n_heads)
+        )
+        
+        self.tanh = nn.Tanh()
+        self.softmax = nn.Softmax(dim=-1)
+
+    def forward(self, input, identity):
+        '''
+        input with shape (N, M, L, H), in which:
+            N - batch size
+            M - number of device
+            L - sequence length
+            H - input features
+        identity with shape (N, M, H)
+        '''
+        N, M, L, _ = input.shape
+        # print(input.shape)
+        input_merge_device = input.transpose(1,2).contiguous().view(N, L, -1).contiguous()
+        # print(input_merge_device.shape)
+
+        input_merge, (n_heads_lstm_ctx, _)  = self.context_lstm(input_merge_device)
+        input_merge = input_merge.view(N, L, M, -1).transpose(1,2).contiguous().view(N, M, -1).contiguous()
+        # print(input_merge_device.shape)
+        n_keys = n_heads_lstm_ctx.squeeze().view(N, M, -1).contiguous()
+        # print(n_keys.shape)
+        if self.query_dim != self.key_dim:
+            identity = self.query_tfm(identity)
+
+        keys_query = self.tanh(n_keys + identity)
+        scores = self.score_module(keys_query).view(N, M, self.n_heads, M).contiguous()
+        # print(scores.shape)
+        distribution = self.softmax(scores).view(N, M, -1).transpose(1,2).contiguous()
+        # print(distribution.shape)
+        attention_heads = torch.bmm(distribution, input_merge).view(N, M, self.n_heads, -1).contiguous()
+        # print(attention_heads.shape)
+        attention_vecs = torch.mean(attention_heads, dim=2).contiguous()
+        # print(attention_vecs.shape)
+        return attention_vecs.view(N,M,L,-1).contiguous()
+        
 class Attention(nn.Module):
     def __init__(self, hidden_size, method="dot"):
         '''
@@ -364,7 +417,11 @@ class IdentityAwaredCalibModule_v3(nn.Module):
         return x
 
 if __name__ == '__main__':
-    module = IdentityAwaredCalibModule_v2(torch.device('cuda'),input_dim=128, ouput_dim=5)
-    x = torch.randn(7, 128, 128)
-    i = torch.randn(128, 64)
-    print(module(x, i).shape)
+    # module = IdentityAwaredCalibModule_v2(torch.device('cuda'),input_dim=128, ouput_dim=5)
+    x = torch.randn(128, 5, 7, 64)
+    i = torch.randn(128, 5, 64)
+    # print(module(x, i).shape)
+    module = IdentityMergingModule(n_devices=5, query_dim=64, key_dim=64, n_heads=2)
+    out = module(x, i)
+    print(out.shape)
+

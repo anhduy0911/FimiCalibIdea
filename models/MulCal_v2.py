@@ -16,6 +16,7 @@ class MulCal(nn.Module):
 
         self.extractor = SeriesEncoder(input_dim, hidden_dim)
         self.identity = IdentityLayer_v2(hidden_dim * 2, hidden_dim, n_class)
+        self.seperate_module = IdentityMergingModule(self.n_class, self.hidden_dim, self.hidden_dim * 2, 3)
         self.calib = IdentityAwaredCalibModule_v2(device, hidden_dim * 2, output_dim)
 
     def forward(self, input, label):
@@ -29,17 +30,32 @@ class MulCal(nn.Module):
 
         _, M, _, _ = input.shape
 
-        calib_outs = []
+        latent_inputs = []
+        identity_latents = []
         for i in range(M):
             input_i = input[:, i, :, :]
             label_i = label[:, i, :]
             input_i = (input_i - self.data_mean[i]) / self.data_std[i]
-            latent_input_i = self.extractor(input_i)
+            latent_input_i = self.extractor(input_i).transpose(0, 1).contiguous()
             identity_latent_input_i = self.identity(label_i)
+            latent_inputs.append(latent_input_i)
+            identity_latents.append(identity_latent_input_i)
+        
+        latent_input = torch.stack(latent_inputs, dim=1)
+        # print(latent_input.shape)
+        identity_latent = torch.stack(identity_latents, dim=1)
+        # print(identity_latent.shape)
 
+        merged_inputs = self.seperate_module(latent_input, identity_latent)
+        # print(merged_inputs.shape)
+        calib_outs = []
+        for i in range(M):
             # Calibration
             # latent_input_i = latent_input_i.permute(1, 0, 2).contiguous()
-            calib_output = self.calib(latent_input_i, identity_latent_input_i)
+            merged_input_i = merged_inputs[:, i, :, :].transpose(0, 1).contiguous()
+            identity_latent_input_i = identity_latent[:, i, :]
+
+            calib_output = self.calib(merged_input_i, identity_latent_input_i)
             calib_output = calib_output * self.data_std[i] + self.data_mean[i]
             calib_outs.append(calib_output)
 
@@ -49,12 +65,13 @@ class MulCal(nn.Module):
 
 
 if __name__ == '__main__':
-    mean = torch.rand(5,7)
-    std = torch.rand(5,7)
+    import numpy as np
+    mean = np.random.rand(5,4)
+    std = np.random.rand(5,4)
     model = MulCal(CFG.input_dim, CFG.hidden_dim, CFG.output_dim, CFG.n_class, 'cpu', mean, std)
     print(model)
 
-    input = torch.randn(2, 5, 30, CFG.input_dim)
+    input = torch.randn(2, 5, 7, CFG.input_dim)
     label = torch.randn(2, 5, 5)
     calib_outs = model(input, label)
 

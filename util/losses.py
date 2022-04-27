@@ -41,8 +41,8 @@ class ConstrastiveLoss():
         similarity_positives = torch.stack(similarity_positives, dim=0)
         # print(similarity_positives)
 
-        # losses = - torch.log(torch.exp(similarity_positives / self.temperature) / (torch.exp(similarity_negative / self.temperature) + torch.exp(similarity_positives / self.temperature)))
-        losses = similarity_positives * torch.log(similarity_positives / inverse_similarity_negative)
+        losses = - torch.log(torch.exp(similarity_positives / self.temperature) / (torch.exp(similarity_negative / self.temperature) + torch.exp(similarity_positives / self.temperature)))
+        # losses = similarity_positives * torch.log(similarity_positives / inverse_similarity_negative)
         # print(losses)
 
         return torch.mean(losses)
