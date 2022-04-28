@@ -71,7 +71,6 @@ class SingleCal(nn.Module):
         calib_output = self.calib(latent_input)
         calib_output = calib_output.permute(1, 0, 2).contiguous()
         calib_output = calib_output * self.data_std + self.data_mean
-        
         return calib_output
 
 if __name__ == '__main__':

@@ -121,6 +121,7 @@ class MultiCalibModel:
         mse, mae, mape = 0, 0, 0
         cnt = 0
         preds = []
+        gtruths = []
         for x, y, lab in self.test_loader:
             cnt += 1
             x = x.to(self.device)
@@ -129,16 +130,27 @@ class MultiCalibModel:
             pred, _ = self.model(x, lab)
 
             preds.append(pred.cpu().detach().numpy())
-            mse += torch.mean((pred - y) ** 2)
-            mae += torch.abs(pred - y).mean()
-            mape += torch.abs(pred - y).mean() / y.mean() * 100
+            gtruths.append(y.cpu().detach().numpy())
+            # mse += torch.mean((pred - y) ** 2)
+            # mae += torch.abs(pred - y).mean()
+            # mape += torch.abs(pred - y).mean() / y.mean() * 100
 
         preds = np.concatenate(preds, axis=0)
-        mse /= cnt
-        mae /= cnt
-        mape /= cnt
+        gtruths = np.concatenate(gtruths, axis=0)
+        N, M, L, H = preds.shape
+        preds_flt = preds.transpose(1,0,2,3).reshape(M, -1)
+        gtruths_flt =  gtruths.transpose(1,0,2,3).reshape(M, -1)
 
-        print(f"MSE_test: {mse:.4f}, MAE_test: {mae:.4f}, MAPE_test: {mape:.4f}")
+        print(preds.shape)
+        print(gtruths.shape)
+        mse = np.square(preds_flt - gtruths_flt).mean(axis=1)
+        mae = np.abs(preds_flt - gtruths_flt).mean(axis=1)
+        mape = np.abs(preds_flt - gtruths_flt).mean(axis=1) / gtruths_flt.mean(axis=1) * 100
+        # mse /= cnt
+        # mae /= cnt
+        # mape /= cnt
+
+        print(f"MSE_test: {mse}, MSE mean: {mse.mean()} \nMAE_test: {mae}, MAE mean: {mae.mean()}, \nMAPE_test: {mape}, MAPE mean: {mape.mean()}")
     
         ids = self.args.device_ids[1:]
         print(ids)

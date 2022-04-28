@@ -54,7 +54,6 @@ class MulCal(nn.Module):
             # latent_input_i = latent_input_i.permute(1, 0, 2).contiguous()
             merged_input_i = merged_inputs[:, i, :, :].transpose(0, 1).contiguous()
             identity_latent_input_i = identity_latent[:, i, :]
-
             calib_output = self.calib(merged_input_i, identity_latent_input_i)
             calib_output = calib_output * self.data_std[i] + self.data_mean[i]
             calib_outs.append(calib_output)
