@@ -95,8 +95,8 @@ class IdentityMergingModule(nn.Module):
         input_merge_device = input.transpose(1,2).contiguous().view(N, L, -1).contiguous()
         # print(input_merge_device.shape)
 
-        input_merge, (n_heads_lstm_ctx, _)  = self.context_lstm(input_merge_device)
-        input_merge = input_merge.view(N, L, M, -1).transpose(1,2).contiguous().view(N, M, -1).contiguous()
+        input_merge, (n_heads_lstm_ctx, _)  = self.context_lstm(input_merge_device) # n_heads_lstm_ctx - (batch, 1, key_dim * n_devices)
+        input_merge = input_merge.view(N, L, M, -1).transpose(1,2).contiguous().view(N, M, -1).contiguous() 
         # print(input_merge_device.shape)
         n_keys = n_heads_lstm_ctx.squeeze().view(N, M, -1).contiguous()
         # print(n_keys.shape)
